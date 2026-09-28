@@ -14,11 +14,11 @@ const App = () => {
         outroImage: null,
     });
     const [audioEnabled, setAudioEnabled] = useState(false);
-    const [liveSpeed, setLiveSpeed] = useState(105); // Standard smooth reading WPM
+    const [liveSpeed, setLiveSpeed] = useState(105);
 
     const [isRecordingMode, setIsRecordingMode] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
-    const [micEnabled, setMicEnabled] = useState(true); // Default mic ON for video recording
+    const [micEnabled, setMicEnabled] = useState(true);
     const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
     const [recordingStatus, setRecordingStatus] = useState("");
 
@@ -34,12 +34,12 @@ const App = () => {
     const [fontSize, setFontSize] = useState(22);
 
     // Export & Share Modal State
-    const [exportedVideo, setExportedVideo] = useState(null); // { url, blob, fileName, uri }
+    const [exportedVideo, setExportedVideo] = useState(null);
 
     const [showControls, setShowControls] = useState(true);
     const [controlsTimeout, setControlsTimeout] = useState(null);
     const [theme, setTheme] = useState('dark');
-    const [activeTab, setActiveTab] = useState('preview'); // 'preview' | 'controls' for mobile view
+    const [activeTab, setActiveTab] = useState('preview');
 
     const mediaRecorderRef = useRef(null);
     const audioContextRef = useRef(null);
@@ -56,32 +56,57 @@ const App = () => {
         outroImage: null
     });
 
-    // Camera Stream Management
+    // Real Camera Stream Management with Multi-tier Fallback
     useEffect(() => {
         let stream = null;
         if (cameraEnabled) {
-            const constraints = {
-                video: {
-                    facingMode: isFrontCamera ? 'user' : 'environment',
-                    width: { ideal: 1080 },
-                    height: { ideal: 1920 }
-                },
-                audio: micEnabled
-            };
-            navigator.mediaDevices?.getUserMedia(constraints)
-                .then(s => {
-                    stream = s;
-                    setCameraStream(s);
-                    if (cameraVideoRef.current) {
-                        cameraVideoRef.current.srcObject = s;
-                        cameraVideoRef.current.play().catch(e => console.log("Cam play err:", e));
+            const initCamera = async () => {
+                const constraintOptions = [
+                    {
+                        video: {
+                            facingMode: isFrontCamera ? 'user' : 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: true
+                    },
+                    {
+                        video: {
+                            facingMode: isFrontCamera ? 'user' : 'environment'
+                        },
+                        audio: true
+                    },
+                    {
+                        video: true,
+                        audio: true
                     }
-                })
-                .catch(err => {
-                    console.error("Camera access error:", err);
-                    alert("Camera Permission Required: " + err.message);
+                ];
+
+                let activeStream = null;
+                let lastErr = null;
+                for (const constraints of constraintOptions) {
+                    try {
+                        activeStream = await navigator.mediaDevices.getUserMedia(constraints);
+                        if (activeStream) break;
+                    } catch (err) {
+                        lastErr = err;
+                    }
+                }
+
+                if (activeStream) {
+                    stream = activeStream;
+                    setCameraStream(activeStream);
+                    if (cameraVideoRef.current) {
+                        cameraVideoRef.current.srcObject = activeStream;
+                        cameraVideoRef.current.play().catch(e => console.log("Camera play err:", e));
+                    }
+                } else {
+                    console.error("Camera access error:", lastErr);
+                    alert("Camera Permission Required: Please allow Camera permissions in your phone settings.\n(" + (lastErr ? lastErr.message : "Error opening device camera") + ")");
                     setCameraEnabled(false);
-                });
+                }
+            };
+            initCamera();
         } else {
             if (cameraStream) {
                 cameraStream.getTracks().forEach(t => t.stop());
@@ -127,86 +152,75 @@ const App = () => {
     };
 
     // ===============================================
-    // UNIFIED RECORDING ENGINE (HD CANVAS + CAMERA + AUDIO)
+    // UNIFIED RECORDING ENGINE (HD CANVAS + REAL CAMERA + AUDIO)
     // ===============================================
     const startRecording = async () => {
         try {
-            const isNative = Capacitor.isNativePlatform();
-            const hasDisplayMedia = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
-
             setIsRecordingMode(true);
             setActiveTab('preview');
             setRecordingStatus("PREPARING STUDIO...");
 
-            const useDirectCanvas = true; // Use 1080x1920 Direct Canvas Engine for guaranteed HD across all devices & APK
-            let finalStream;
-            let canvas = null;
+            const canvas = document.createElement('canvas');
+            canvas.width = 1080;
+            canvas.height = 1920;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
 
-            if (useDirectCanvas) {
-                setRecordingStatus("INITIALIZING HD CANVAS...");
-                canvas = document.createElement('canvas');
-                canvas.width = 1080;
-                canvas.height = 1920;
-                const ctx = canvas.getContext('2d', { alpha: false });
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
+            const mediaImages = await Promise.all(
+                (draftNews.mediaList || []).map(src => preloadImage(src))
+            );
+            const outroImg = draftNews.outroImage ? await preloadImage(draftNews.outroImage) : null;
 
-                // Preload media
-                const mediaImages = await Promise.all(
-                    (draftNews.mediaList || []).map(src => preloadImage(src))
-                );
-                const outroImg = draftNews.outroImage ? await preloadImage(draftNews.outroImage) : null;
+            const renderer = createReelRenderer({
+                heading: draftNews.heading,
+                content: draftNews.content,
+                mediaImages: mediaImages.filter(Boolean),
+                outroImage: outroImg,
+                wpm: liveSpeed,
+                theme: theme,
+                cameraVideoElement: cameraVideoRef.current,
+                isFrontCamera: isFrontCamera,
+                prompterMode: prompterMode,
+                prompterHeight: prompterHeight,
+                prompterOpacity: prompterOpacity,
+                fontSize: fontSize * 2
+            });
 
-                const renderer = createReelRenderer({
-                    heading: draftNews.heading,
-                    content: draftNews.content,
-                    mediaImages: mediaImages.filter(Boolean),
-                    outroImage: outroImg,
-                    wpm: liveSpeed,
-                    theme: theme,
-                    cameraVideoElement: cameraVideoRef.current,
-                    isFrontCamera: isFrontCamera,
-                    prompterMode: prompterMode,
-                    prompterHeight: prompterHeight,
-                    prompterOpacity: prompterOpacity,
-                    fontSize: fontSize * 2 // Scaled for 1080p canvas resolution
-                });
+            let startTime = null;
+            const renderLoop = (time) => {
+                if (!startTime) startTime = time;
+                renderer.renderFrame(ctx, time);
 
-                let startTime = null;
-                const renderLoop = (time) => {
-                    if (!startTime) startTime = time;
-                    renderer.renderFrame(ctx, time);
-
-                    if (renderer.isComplete()) {
-                        stopRecording();
-                        return;
-                    }
-                    animationFrameRef.current = requestAnimationFrame(renderLoop);
-                };
+                if (renderer.isComplete()) {
+                    stopRecording();
+                    return;
+                }
                 animationFrameRef.current = requestAnimationFrame(renderLoop);
+            };
+            animationFrameRef.current = requestAnimationFrame(renderLoop);
 
-                const canvasStream = canvas.captureStream(30);
-                activeStreamRef.current = canvasStream;
-                finalStream = canvasStream;
+            const canvasStream = canvas.captureStream(30);
+            activeStreamRef.current = canvasStream;
+            let finalStream = canvasStream;
 
-                // Add audio: Camera audio track or dedicated microphone track
-                let audioStream = null;
-                if (cameraStream && cameraStream.getAudioTracks().length > 0) {
-                    audioStream = cameraStream;
-                } else if (micEnabled) {
-                    try {
-                        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    } catch (e) {
-                        console.warn("Microphone not available:", e);
-                    }
+            // Audio mixing from camera or microphone
+            let audioStream = null;
+            if (cameraStream && cameraStream.getAudioTracks().length > 0) {
+                audioStream = cameraStream;
+            } else if (micEnabled) {
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                } catch (e) {
+                    console.warn("Microphone access:", e);
                 }
+            }
 
-                if (audioStream && audioStream.getAudioTracks().length > 0) {
-                    finalStream = new MediaStream([
-                        ...canvasStream.getVideoTracks(),
-                        ...audioStream.getAudioTracks()
-                    ]);
-                }
+            if (audioStream && audioStream.getAudioTracks().length > 0) {
+                finalStream = new MediaStream([
+                    ...canvasStream.getVideoTracks(),
+                    ...audioStream.getAudioTracks()
+                ]);
             }
 
             // Codec Selection: Universal MP4 First + Lightweight Full HD (1080p) Bitrate
@@ -229,7 +243,6 @@ const App = () => {
                 }
             }
 
-            // Lightweight HD: 4.5 Mbps video + 128 kbps audio (Crisp 1080x1920 Full HD at ~12MB for 30s)
             const recorderOptions = {
                 videoBitsPerSecond: 4500000,
                 audioBitsPerSecond: 128000
@@ -249,10 +262,8 @@ const App = () => {
                     const blob = new Blob(chunksRef.current, { type: mimeType });
                     const blobUrl = URL.createObjectURL(blob);
 
-                    // Save locally to device cache & documents
                     const saveResult = await saveReelVideo(blob, selectedCodec.ext);
 
-                    // Open Ready Modal with Player, Save & Share options
                     setExportedVideo({
                         url: blobUrl,
                         blob: blob,
@@ -295,7 +306,6 @@ const App = () => {
         }
     };
 
-    // Share Handler from Modal
     const handleShareVideo = async () => {
         if (!exportedVideo) return;
         try {
@@ -322,18 +332,16 @@ const App = () => {
                     });
                 }
             } else {
-                // Fallback direct download
                 const a = document.createElement('a');
                 a.href = exportedVideo.url;
                 a.download = exportedVideo.fileName;
                 a.click();
             }
         } catch (e) {
-            console.log("Share cancelled or failed:", e);
+            console.log("Share notice:", e);
         }
     };
 
-    // Download Handler from Modal
     const handleDownloadVideo = () => {
         if (!exportedVideo) return;
         const a = document.createElement('a');
@@ -347,7 +355,7 @@ const App = () => {
     };
 
     return (
-        <div className={`w-full h-screen bg-neutral-950 flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
+        <div className={`w-full h-[100dvh] bg-neutral-950 flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
 
             {/* Hidden Offscreen Video Element for Live Camera Synthesis onto Canvas */}
             <video
@@ -360,16 +368,16 @@ const App = () => {
 
             {/* Mobile Tab Navigation Bar */}
             {!isRecordingMode && (
-                <div className="md:hidden flex bg-neutral-900 border-b border-neutral-800 z-40 p-2 gap-2">
+                <div className="md:hidden flex bg-neutral-900 border-b border-neutral-800 z-40 p-2 gap-2 shrink-0">
                     <button
                         onClick={() => setActiveTab('preview')}
-                        className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'preview' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 text-neutral-400'}`}
+                        className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'preview' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 text-neutral-400'}`}
                     >
                         👁 Studio Preview
                     </button>
                     <button
                         onClick={() => setActiveTab('controls')}
-                        className={`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'controls' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 text-neutral-400'}`}
+                        className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'controls' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 text-neutral-400'}`}
                     >
                         ⚙ Control Room
                     </button>
@@ -377,15 +385,15 @@ const App = () => {
             )}
 
             {/* Main Stage / Teleprompter Canvas */}
-            <div className={`transition-all duration-700 ease-in-out flex flex-col justify-center items-center relative ${isRecordingMode ? 'w-full h-full absolute inset-0 z-[100] bg-black' : activeTab === 'preview' ? 'flex-1 h-full' : 'hidden md:flex flex-1 h-full'}`}>
+            <div className={`transition-all duration-500 flex flex-col justify-center items-center relative overflow-hidden ${isRecordingMode ? 'w-full h-full absolute inset-0 z-[100] bg-black' : activeTab === 'preview' ? 'flex-1 h-full' : 'hidden md:flex flex-1 h-full'}`}>
 
-                {/* Quick Floating Top Bar (Controls for Speed, Camera & Mode right on screen) */}
+                {/* Top Quick Floating Controls Bar */}
                 {!isRecordingMode && (
-                    <div className="absolute top-3 z-30 flex items-center gap-2 bg-neutral-900/90 backdrop-blur-xl px-3 py-1.5 rounded-2xl border border-neutral-800 shadow-xl max-w-[95%] overflow-x-auto no-scrollbar">
+                    <div className="absolute top-3 z-30 flex items-center gap-2 bg-neutral-900/95 backdrop-blur-xl px-3 py-1.5 rounded-2xl border border-neutral-800 shadow-2xl max-w-[95%] overflow-x-auto no-scrollbar">
                         {/* Camera Quick Toggle */}
                         <button
                             onClick={() => setCameraEnabled(!cameraEnabled)}
-                            className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-all ${cameraEnabled ? 'bg-emerald-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}
+                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md ${cameraEnabled ? 'bg-emerald-500 text-black font-black' : 'bg-neutral-800 text-neutral-300'}`}
                         >
                             📷 {cameraEnabled ? 'Cam ON' : 'Cam OFF'}
                         </button>
@@ -394,17 +402,17 @@ const App = () => {
                         {cameraEnabled && (
                             <button
                                 onClick={() => setIsFrontCamera(!isFrontCamera)}
-                                className="px-2 py-1 rounded-xl text-[10px] font-bold bg-neutral-800 text-neutral-300"
+                                className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-neutral-800 text-neutral-200 border border-neutral-700"
                             >
                                 🔄 {isFrontCamera ? 'Front' : 'Back'}
                             </button>
                         )}
 
                         {/* Speed Stepper */}
-                        <div className="flex items-center gap-1 bg-neutral-800/80 px-2 py-0.5 rounded-xl border border-neutral-700/60">
+                        <div className="flex items-center gap-1 bg-neutral-800/90 px-2 py-0.5 rounded-xl border border-neutral-700">
                             <button
                                 onClick={() => setLiveSpeed(prev => Math.max(30, prev - 5))}
-                                className="text-yellow-500 font-black text-xs px-1 hover:text-white"
+                                className="text-yellow-500 font-black text-sm px-1.5 hover:text-white"
                             >
                                 -
                             </button>
@@ -413,19 +421,19 @@ const App = () => {
                             </span>
                             <button
                                 onClick={() => setLiveSpeed(prev => Math.min(260, prev + 5))}
-                                className="text-yellow-500 font-black text-xs px-1 hover:text-white"
+                                className="text-yellow-500 font-black text-sm px-1.5 hover:text-white"
                             >
                                 +
                             </button>
                         </div>
 
                         {/* Prompter Mode Quick Picker */}
-                        <div className="flex gap-1 bg-neutral-800/80 p-0.5 rounded-xl">
+                        <div className="flex gap-1 bg-neutral-800/90 p-0.5 rounded-xl">
                             {['center', 'bottom', 'top'].map(m => (
                                 <button
                                     key={m}
                                     onClick={() => setPrompterMode(m)}
-                                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${prompterMode === m ? 'bg-yellow-500 text-black' : 'text-neutral-400'}`}
+                                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${prompterMode === m ? 'bg-yellow-500 text-black shadow-sm' : 'text-neutral-400'}`}
                                 >
                                     {m === 'center' ? 'Center' : m === 'bottom' ? 'Ticker' : 'Top'}
                                 </button>
@@ -450,6 +458,21 @@ const App = () => {
                     fontSize={fontSize}
                 />
 
+                {/* DIRECT BIG RED RECORD BUTTON ON PREVIEW SCREEN (INSTANT 1-TAP RECORDING) */}
+                {!isRecordingMode && activeTab === 'preview' && (
+                    <div className="absolute bottom-5 z-40 flex items-center justify-center">
+                        <button
+                            type="button"
+                            onClick={startRecording}
+                            className="bg-red-600 hover:bg-red-500 active:scale-95 text-white px-7 py-3 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2.5 shadow-2xl shadow-red-600/50 border-2 border-red-400 animate-bounce"
+                        >
+                            <span className="w-3.5 h-3.5 bg-white rounded-full"></span>
+                            🎬 START RECORDING REEL
+                        </button>
+                    </div>
+                )}
+
+                {/* In-Recording Floating Status & Stop Button */}
                 {isRecordingMode && (
                     <>
                         <div className={`absolute top-6 right-4 z-[120] flex items-center gap-2.5 bg-black/80 backdrop-blur-xl px-4 py-2 rounded-2xl border border-red-500/30 shadow-2xl transition-all duration-500 ${recordingStatus ? 'opacity-100' : 'opacity-0'}`}>
@@ -478,8 +501,8 @@ const App = () => {
                 )}
             </div>
 
-            {/* Control Panel Drawer */}
-            <div className={`transition-all duration-500 ${isRecordingMode ? 'hidden' : activeTab === 'controls' ? 'w-full flex-1 md:w-88 md:flex-none' : 'hidden md:block w-88'}`}>
+            {/* Control Panel Drawer (Smooth Touch Scrolling + Fixed Bottom Record Button) */}
+            <div className={`transition-all duration-500 h-[100dvh] ${isRecordingMode ? 'hidden' : activeTab === 'controls' ? 'w-full flex-1 md:w-96 md:flex-none' : 'hidden md:block w-96'}`}>
                 <ControlPanel
                     draftNews={draftNews}
                     setDraftNews={setDraftNews}

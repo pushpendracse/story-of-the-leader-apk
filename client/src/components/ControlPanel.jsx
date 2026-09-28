@@ -3,7 +3,7 @@ import React from 'react';
 const ControlPanel = ({
     onBroadcast,
     onSpeedChange,
-    typingSpeed = 110,
+    typingSpeed = 105,
     audioEnabled,
     onAudioToggle,
     theme,
@@ -16,7 +16,6 @@ const ControlPanel = ({
     draftNews,
     setDraftNews,
     recordingStatus,
-    // Camera & Prompter Customization Props
     cameraEnabled,
     setCameraEnabled,
     isFrontCamera,
@@ -60,32 +59,35 @@ const ControlPanel = ({
     ];
 
     return (
-        <div className="w-full h-full md:fixed md:top-0 md:right-0 md:w-88 bg-neutral-950 border-l border-neutral-800 text-white z-50 p-5 flex flex-col shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-black text-yellow-500 uppercase tracking-tighter italic flex items-center gap-2">
-                    <span className="w-2.5 h-6 bg-yellow-500 rounded-full"></span>
-                    Master Studio Control
+        <div className="w-full h-full md:fixed md:top-0 md:right-0 md:w-96 bg-neutral-950 border-l border-neutral-800 text-white z-50 flex flex-col shadow-2xl relative">
+            {/* Header (Fixed at top) */}
+            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-900/90 backdrop-blur-md shrink-0">
+                <h2 className="text-base font-black text-yellow-500 uppercase tracking-tighter italic flex items-center gap-2">
+                    <span className="w-2.5 h-5 bg-yellow-500 rounded-full"></span>
+                    Control Room
                 </h2>
-                <button
-                    onClick={onToggleTheme}
-                    className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-neutral-900 border border-neutral-700 text-yellow-400 hover:bg-neutral-800 transition-all"
-                >
-                    {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={onToggleTheme}
+                        className="text-[10px] font-bold px-2 py-1 rounded-lg bg-neutral-800 border border-neutral-700 text-yellow-400"
+                    >
+                        {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+                    </button>
+                </div>
             </div>
 
-            {/* Scrollable Control Area */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 no-scrollbar pb-6">
+            {/* Scrollable Content Body (Full touch scrolling with visible scrollbar) */}
+            <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 space-y-4 pb-36">
 
-                {/* 1. Camera Control Section */}
-                <div className="bg-neutral-900/90 p-3.5 rounded-2xl border border-neutral-800 space-y-3">
+                {/* 1. Live Camera Switch Section */}
+                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-3 shadow-md">
                     <div className="flex items-center justify-between">
-                        <label className="text-[11px] uppercase font-black tracking-wider text-neutral-300 flex items-center gap-1.5">
-                            📷 Live Camera (Front/Anchor)
+                        <label className="text-xs uppercase font-black tracking-wider text-neutral-200 flex items-center gap-1.5">
+                            📷 Real Camera (Front / Anchor)
                         </label>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cameraEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-neutral-800 text-neutral-500'}`}>
-                            {cameraEnabled ? 'ACTIVE' : 'OFF'}
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${cameraEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-neutral-800 text-neutral-400'}`}>
+                            {cameraEnabled ? '● ACTIVE' : 'OFF'}
                         </span>
                     </div>
 
@@ -93,40 +95,45 @@ const ControlPanel = ({
                         <button
                             type="button"
                             onClick={() => setCameraEnabled(!cameraEnabled)}
-                            className={`py-2 px-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${cameraEnabled ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'bg-neutral-800 text-neutral-400 hover:text-white'}`}
+                            className={`py-3 px-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${cameraEnabled ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/30' : 'bg-neutral-800 text-neutral-200 border border-neutral-700 hover:bg-neutral-700'}`}
                         >
-                            {cameraEnabled ? '✓ Camera ON' : 'Turn Camera ON'}
+                            {cameraEnabled ? '✓ Camera Active' : '▶ Turn Camera ON'}
                         </button>
 
                         <button
                             type="button"
                             disabled={!cameraEnabled}
                             onClick={() => setIsFrontCamera(!isFrontCamera)}
-                            className={`py-2 px-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border border-neutral-700 ${cameraEnabled ? 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700' : 'opacity-40 cursor-not-allowed text-neutral-600'}`}
+                            className={`py-3 px-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border border-neutral-700 ${cameraEnabled ? 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700' : 'opacity-40 cursor-not-allowed text-neutral-600'}`}
                         >
                             🔄 {isFrontCamera ? 'Front Cam' : 'Back Cam'}
                         </button>
                     </div>
+                    {cameraEnabled && (
+                        <p className="text-[10px] text-emerald-400/80 italic text-center">
+                            Real device camera is active! You will see yourself on the preview screen.
+                        </p>
+                    )}
                 </div>
 
                 {/* 2. Speed Control Room Section */}
-                <div className="bg-neutral-900/90 p-3.5 rounded-2xl border border-neutral-800 space-y-3">
+                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-3 shadow-md">
                     <div className="flex items-center justify-between">
-                        <label className="text-[11px] uppercase font-black tracking-wider text-yellow-500 flex items-center gap-1">
-                            ⏱️ Reading Speed: <span className="text-white text-xs">{typingSpeed} WPM</span>
+                        <label className="text-xs uppercase font-black tracking-wider text-yellow-500 flex items-center gap-1">
+                            ⏱️ Prompter Speed: <span className="text-white font-bold ml-1">{typingSpeed} WPM</span>
                         </label>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1.5">
                             <button
                                 type="button"
                                 onClick={() => onSpeedChange(Math.max(30, typingSpeed - 5))}
-                                className="w-6 h-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-xs font-black flex items-center justify-center text-yellow-500"
+                                className="w-7 h-7 bg-neutral-800 hover:bg-neutral-700 active:scale-95 rounded-lg text-sm font-black flex items-center justify-center text-yellow-500 border border-neutral-700"
                             >
                                 -
                             </button>
                             <button
                                 type="button"
                                 onClick={() => onSpeedChange(Math.min(280, typingSpeed + 5))}
-                                className="w-6 h-6 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-xs font-black flex items-center justify-center text-yellow-500"
+                                className="w-7 h-7 bg-neutral-800 hover:bg-neutral-700 active:scale-95 rounded-lg text-sm font-black flex items-center justify-center text-yellow-500 border border-neutral-700"
                             >
                                 +
                             </button>
@@ -140,7 +147,7 @@ const ControlPanel = ({
                                 key={preset.wpm}
                                 type="button"
                                 onClick={() => onSpeedChange(preset.wpm)}
-                                className={`py-1.5 px-1 rounded-xl text-[10px] font-bold transition-all ${typingSpeed === preset.wpm ? 'bg-yellow-500 text-black shadow-md shadow-yellow-500/20' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+                                className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all ${typingSpeed === preset.wpm ? 'bg-yellow-500 text-black shadow-md shadow-yellow-500/20 font-black' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
                             >
                                 {preset.label}
                             </button>
@@ -154,48 +161,48 @@ const ControlPanel = ({
                         step="5"
                         value={typingSpeed}
                         onChange={(e) => onSpeedChange(parseInt(e.target.value))}
-                        className="w-full accent-yellow-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                        className="w-full accent-yellow-500 h-2 bg-neutral-800 rounded-lg cursor-pointer"
                     />
                 </div>
 
                 {/* 3. Text Position & Screen Range Section */}
-                <div className="bg-neutral-900/90 p-3.5 rounded-2xl border border-neutral-800 space-y-3">
-                    <label className="text-[11px] uppercase font-black tracking-wider text-neutral-300 block">
-                        📐 Prompter Position & Screen Area
+                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-3 shadow-md">
+                    <label className="text-xs uppercase font-black tracking-wider text-neutral-200 block">
+                        📐 Prompter Position on Screen
                     </label>
 
                     {/* Mode buttons */}
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-3 gap-2">
                         <button
                             type="button"
                             onClick={() => setPrompterMode('center')}
-                            className={`py-2 px-1 rounded-xl text-[10px] font-bold uppercase transition-all ${prompterMode === 'center' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+                            className={`py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all ${prompterMode === 'center' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
                         >
-                            🎯 Center
+                            🎯 Center Card
                         </button>
                         <button
                             type="button"
                             onClick={() => setPrompterMode('bottom')}
-                            className={`py-2 px-1 rounded-xl text-[10px] font-bold uppercase transition-all ${prompterMode === 'bottom' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+                            className={`py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all ${prompterMode === 'bottom' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
                         >
                             📺 Bottom Ticker
                         </button>
                         <button
                             type="button"
                             onClick={() => setPrompterMode('top')}
-                            className={`py-2 px-1 rounded-xl text-[10px] font-bold uppercase transition-all ${prompterMode === 'top' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+                            className={`py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all ${prompterMode === 'top' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
                         >
                             👁️ Top Camera
                         </button>
                     </div>
 
                     {/* Screen Height Coverage */}
-                    <div className="space-y-1.5">
-                        <div className="flex justify-between text-[10px] text-neutral-400">
+                    <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between text-[11px] text-neutral-300">
                             <span>Screen Height Coverage</span>
                             <span className="font-bold text-yellow-500">{Math.round(prompterHeight * 100)}%</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-3 gap-2">
                             {[
                                 { label: '35% Compact', val: 0.35 },
                                 { label: '50% Half', val: 0.50 },
@@ -205,7 +212,7 @@ const ControlPanel = ({
                                     key={hOpt.val}
                                     type="button"
                                     onClick={() => setPrompterHeight(hOpt.val)}
-                                    className={`py-1 rounded-lg text-[9px] font-bold uppercase ${prompterHeight === hOpt.val ? 'bg-neutral-700 text-white border border-yellow-500/50' : 'bg-neutral-800 text-neutral-400'}`}
+                                    className={`py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all ${prompterHeight === hOpt.val ? 'bg-neutral-700 text-white border border-yellow-500/60 font-black' : 'bg-neutral-800 text-neutral-400'}`}
                                 >
                                     {hOpt.label}
                                 </button>
@@ -214,7 +221,7 @@ const ControlPanel = ({
                     </div>
 
                     {/* Font Size & Transparency */}
-                    <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-3 pt-1">
                         <div>
                             <label className="text-[10px] text-neutral-400 block mb-1">Font Size</label>
                             <div className="flex gap-1">
@@ -228,7 +235,7 @@ const ControlPanel = ({
                                         key={f.size}
                                         type="button"
                                         onClick={() => setFontSize(f.size)}
-                                        className={`flex-1 py-1 rounded-lg text-[10px] font-bold ${fontSize === f.size ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}
+                                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold ${fontSize === f.size ? 'bg-yellow-500 text-black font-black' : 'bg-neutral-800 text-neutral-400'}`}
                                     >
                                         {f.label}
                                     </button>
@@ -238,7 +245,7 @@ const ControlPanel = ({
 
                         <div>
                             <div className="flex justify-between text-[10px] text-neutral-400 mb-1">
-                                <span>Card Opacity</span>
+                                <span>Card Darkness</span>
                                 <span className="font-bold text-yellow-500">{Math.round(prompterOpacity * 100)}%</span>
                             </div>
                             <input
@@ -248,128 +255,95 @@ const ControlPanel = ({
                                 step="0.05"
                                 value={prompterOpacity}
                                 onChange={(e) => setPrompterOpacity(parseFloat(e.target.value))}
-                                className="w-full accent-yellow-500 h-1.5 bg-neutral-800 rounded-lg cursor-pointer"
+                                className="w-full accent-yellow-500 h-2 bg-neutral-800 rounded-lg cursor-pointer"
                             />
                         </div>
                     </div>
                 </div>
 
-                {/* 4. Episode Title & Script */}
-                <div className="space-y-2">
+                {/* 4. Episode Title & Script Input */}
+                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-2.5 shadow-md">
+                    <label className="text-xs uppercase font-black tracking-wider text-neutral-200 block">
+                        📝 Script & Headline
+                    </label>
                     <input
                         value={h}
                         onChange={(e) => setH(e.target.value)}
                         placeholder="Episode / News Headline..."
-                        className="w-full p-3.5 bg-neutral-900 border border-neutral-800 rounded-2xl text-xs outline-none focus:border-yellow-500 transition-all font-bold placeholder-neutral-600"
+                        className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs outline-none focus:border-yellow-500 transition-all font-bold placeholder-neutral-600"
                     />
                     <textarea
                         rows="5"
                         value={c}
                         onChange={(e) => setC(e.target.value)}
-                        placeholder="Write your news script here (auto-scrolls with karaoke highlight)..."
-                        className="w-full p-3.5 bg-neutral-900 border border-neutral-800 rounded-2xl text-xs outline-none focus:border-yellow-500 transition-all resize-none leading-relaxed placeholder-neutral-600 font-serif"
+                        placeholder="Write your news script here (karaoke auto-scrolling)..."
+                        className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs outline-none focus:border-yellow-500 transition-all resize-none leading-relaxed placeholder-neutral-600 font-serif"
                     />
                 </div>
 
-                {/* 5. Background Gallery & Outro (when camera is not used) */}
+                {/* 5. Background Images (shown when camera is OFF) */}
                 {!cameraEnabled && (
-                    <div className="space-y-3 bg-neutral-900/60 p-3.5 rounded-2xl border border-neutral-800">
-                        <div className="space-y-1.5">
-                            <label className="block text-neutral-400 text-[10px] uppercase font-bold tracking-wider">Background Images (Ken Burns Slideshow)</label>
-                            <input
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                onChange={handleMultipleImages}
-                                className="text-[10px] text-neutral-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:text-yellow-500 cursor-pointer w-full"
-                            />
-                            {mediaPreviews.length > 0 && (
-                                <div className="grid grid-cols-4 gap-1.5 mt-2 max-h-24 overflow-y-auto p-1.5 bg-neutral-950 rounded-xl border border-neutral-800">
-                                    {mediaPreviews.map((img, idx) => (
-                                        <div key={idx} className="h-10 rounded-lg overflow-hidden relative group">
-                                            <img src={img} className="w-full h-full object-cover opacity-70 group-hover:opacity-100" alt="Preview" />
-                                            <button
-                                                type="button"
-                                                onClick={() => setMediaPreviews(prev => prev.filter((_, i) => i !== idx))}
-                                                className="absolute inset-0 flex items-center justify-center bg-red-600/80 text-white opacity-0 group-hover:opacity-100 text-[9px] transition-all font-bold"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="space-y-1.5 pt-1">
-                            <label className="block text-neutral-400 text-[10px] uppercase font-bold tracking-wider">Outro Slide Image</label>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => setOutroImage(reader.result);
-                                        reader.readAsDataURL(file);
-                                    }
-                                }}
-                                className="text-[10px] text-neutral-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:text-red-400 cursor-pointer w-full"
-                            />
-                            {outroImage && (
-                                <div className="h-12 rounded-xl overflow-hidden relative border border-neutral-800 mt-1">
-                                    <img src={outroImage} className="w-full h-full object-cover opacity-80" alt="Outro Preview" />
-                                    <button
-                                        type="button"
-                                        onClick={() => setOutroImage(null)}
-                                        className="absolute top-0 right-0 bg-red-600 text-[9px] px-2 py-0.5 rounded-bl-lg font-bold"
-                                    >
-                                        Del
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                    <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-2.5 shadow-md">
+                        <label className="block text-neutral-300 text-xs uppercase font-bold tracking-wider">
+                            🖼️ Background Gallery (Slide Images)
+                        </label>
+                        <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handleMultipleImages}
+                            className="text-[10px] text-neutral-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:text-yellow-500 cursor-pointer w-full"
+                        />
+                        {mediaPreviews.length > 0 && (
+                            <div className="grid grid-cols-4 gap-1.5 mt-2 max-h-24 overflow-y-auto p-1.5 bg-neutral-950 rounded-xl border border-neutral-800">
+                                {mediaPreviews.map((img, idx) => (
+                                    <div key={idx} className="h-10 rounded-lg overflow-hidden relative group">
+                                        <img src={img} className="w-full h-full object-cover opacity-70 group-hover:opacity-100" alt="Preview" />
+                                        <button
+                                            type="button"
+                                            onClick={() => setMediaPreviews(prev => prev.filter((_, i) => i !== idx))}
+                                            className="absolute inset-0 flex items-center justify-center bg-red-600/80 text-white opacity-0 group-hover:opacity-100 text-[9px] font-bold"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* 6. Audio & Master Record Box */}
-                <div className="bg-gradient-to-br from-red-950/40 to-neutral-900 p-4 rounded-2xl border border-red-500/30 space-y-3 shadow-xl">
-                    <div className="flex items-center justify-between">
-                        <label className="text-red-400 text-[10px] uppercase font-black tracking-widest">
-                            Mic & Audio Settings
-                        </label>
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setMicEnabled(!micEnabled)}
-                                title="Microphone"
-                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${micEnabled ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' : 'bg-neutral-800 text-neutral-500'}`}
-                            >
-                                🎤 {micEnabled ? 'Mic ON' : 'Mic OFF'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {recordingStatus && (
-                        <div className="bg-black/60 p-2 rounded-xl border border-red-500/30 text-center">
-                            <span className="text-[11px] text-red-400 font-black animate-pulse uppercase tracking-wider">
-                                ● {recordingStatus}
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Master Record / Broadcast Action */}
-                    <div className="space-y-2 pt-1">
-                        <button
-                            type="button"
-                            onClick={onBroadcast}
-                            className="w-full bg-yellow-500 hover:bg-yellow-400 active:scale-[0.98] text-black py-3.5 rounded-2xl font-black shadow-xl shadow-yellow-500/20 text-xs uppercase tracking-widest transition-all"
-                        >
-                            🎬 Start Live Recording Reel
-                        </button>
-                    </div>
+                {/* 6. Mic Option */}
+                <div className="bg-neutral-900 p-3 rounded-2xl border border-neutral-800 flex items-center justify-between">
+                    <span className="text-xs font-bold text-neutral-300">🎙️ Microphone Audio</span>
+                    <button
+                        type="button"
+                        onClick={() => setMicEnabled(!micEnabled)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${micEnabled ? 'bg-red-500 text-white shadow-md' : 'bg-neutral-800 text-neutral-500'}`}
+                    >
+                        {micEnabled ? 'Mic ON' : 'Mic OFF'}
+                    </button>
                 </div>
 
+            </div>
+
+            {/* FIXED / STICKY BOTTOM ACTION BAR (ALWAYS VISIBLE & NEVER COVERED) */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-neutral-950/95 border-t border-neutral-800 backdrop-blur-xl z-50 flex flex-col gap-1.5 shadow-2xl">
+                {recordingStatus && (
+                    <div className="text-center">
+                        <span className="text-[10px] text-red-400 font-black animate-pulse uppercase tracking-wider">
+                            ● {recordingStatus}
+                        </span>
+                    </div>
+                )}
+                <button
+                    type="button"
+                    onClick={onBroadcast}
+                    className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white py-3.5 rounded-2xl font-black shadow-xl shadow-red-600/30 text-xs uppercase tracking-widest flex items-center justify-center gap-2 border border-red-400"
+                >
+                    <span className="w-3 h-3 bg-white rounded-full animate-ping"></span>
+                    🎬 START RECORDING REEL
+                </button>
             </div>
         </div>
     );
