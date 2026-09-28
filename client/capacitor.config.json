@@ -1,0 +1,10 @@
+{
+  "appId": "com.storyoftheleader.newsreel",
+  "appName": "StoryOfTheLeader",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true
+  }
+}

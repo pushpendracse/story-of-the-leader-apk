@@ -1,0 +1,8 @@
+{
+    "name": "story-of-the-leader-redirect",
+    "private": true,
+    "scripts": {
+        "build": "echo 'Redirecting to client...'",
+        "install": "echo 'Redirecting to client...'"
+    }
+}

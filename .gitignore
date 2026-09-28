@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production Web Build
+client/dist/
+
+# Android build outputs & cache
+client/android/.gradle/
+client/android/build/
+client/android/app/build/
+client/android/local.properties
+client/android/.idea/
+client/android/*.iml
+client/android/app/*.iml
+
+# Logs & temp
+*.log
+.DS_Store
+Thumbs.db
