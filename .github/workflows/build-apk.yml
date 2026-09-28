@@ -17,7 +17,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
+          check-latest: true
+
+      - name: Verify Node Version
+        run: |
+          node -v
+          npm -v
+          which node
 
       - name: Set up Java JDK
         uses: actions/setup-java@v4
@@ -29,19 +36,20 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Install Client Dependencies
+        working-directory: ./client
         run: |
-          cd client
           npm install
 
       - name: Build Web App & Sync Capacitor
+        working-directory: ./client
         run: |
-          cd client
+          node -v
           npm run build
           npx cap sync android
 
       - name: Accept Android Licenses & Build Debug APK
+        working-directory: ./client/android
         run: |
-          cd client/android
           chmod +x ./gradlew
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
           ./gradlew assembleDebug --stacktrace --no-daemon
