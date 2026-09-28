@@ -216,27 +216,45 @@ const App = () => {
                 };
             }
 
-            // Codec Selection
-            let options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 25000000 };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'video/webm;codecs=h264';
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options.mimeType = 'video/webm';
-                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                        options = { mimeType: 'video/mp4' };
-                    }
+            // Codec Selection: Universal MP4 First + Lightweight Full HD (1080p) Bitrate
+            const candidateCodecs = [
+                { mime: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', ext: 'mp4' },
+                { mime: 'video/mp4;codecs=avc1', ext: 'mp4' },
+                { mime: 'video/mp4;codecs=h264', ext: 'mp4' },
+                { mime: 'video/mp4', ext: 'mp4' },
+                { mime: 'video/webm;codecs=h264', ext: 'mp4' },
+                { mime: 'video/webm;codecs=vp9', ext: 'webm' },
+                { mime: 'video/webm;codecs=vp8', ext: 'webm' },
+                { mime: 'video/webm', ext: 'webm' }
+            ];
+
+            let selectedCodec = { mime: '', ext: 'mp4' };
+            for (const cand of candidateCodecs) {
+                if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cand.mime)) {
+                    selectedCodec = cand;
+                    break;
                 }
             }
 
-            const recorder = new MediaRecorder(finalStream, options);
+            // Lightweight HD: 4.5 Mbps video + 128 kbps audio (Crisp 1080x1920 Full HD at ~12MB for 30s)
+            const recorderOptions = {
+                videoBitsPerSecond: 4500000,
+                audioBitsPerSecond: 128000
+            };
+            if (selectedCodec.mime) {
+                recorderOptions.mimeType = selectedCodec.mime;
+            }
+
+            const recorder = new MediaRecorder(finalStream, recorderOptions);
             chunksRef.current = [];
             recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
 
             recorder.onstop = async () => {
-                setRecordingStatus("SAVING VIDEO...");
+                setRecordingStatus("SAVING HD VIDEO...");
                 if (chunksRef.current.length > 0) {
-                    const blob = new Blob(chunksRef.current, { type: chunksRef.current[0].type || 'video/webm' });
-                    await saveReelVideo(blob);
+                    const mimeType = selectedCodec.mime || chunksRef.current[0].type || 'video/mp4';
+                    const blob = new Blob(chunksRef.current, { type: mimeType });
+                    await saveReelVideo(blob, selectedCodec.ext);
                 }
                 setIsRecording(false);
                 setIsRecordingMode(false);
