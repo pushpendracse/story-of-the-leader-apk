@@ -5,8 +5,14 @@ export const createReelRenderer = ({
     content = '',
     mediaImages = [], // Array of loaded HTMLImageElement
     outroImage = null, // Loaded HTMLImageElement or null
-    wpm = 150,
-    theme = 'dark'
+    wpm = 110,
+    theme = 'dark',
+    cameraVideoElement = null, // Live HTMLVideoElement for selfie / front camera
+    isFrontCamera = true,
+    prompterMode = 'center', // 'center' | 'bottom' | 'top'
+    prompterHeight = 0.55, // 0.30 to 0.85 of available height
+    prompterOpacity = 0.80, // 0.20 to 0.95
+    fontSize = 44
 }) => {
     const width = 1080;
     const height = 1920;
@@ -96,8 +102,32 @@ export const createReelRenderer = ({
                 return;
             }
 
-            // Background Media with Ken Burns Zoom & Pan
-            if (mediaImages.length > 0) {
+            // 1. Live Camera Feed (Selfie / Front Camera)
+            let hasLiveCamera = false;
+            if (cameraVideoElement && cameraVideoElement.readyState >= 2 && cameraVideoElement.videoWidth > 0) {
+                hasLiveCamera = true;
+                ctx.save();
+                const vW = cameraVideoElement.videoWidth;
+                const vH = cameraVideoElement.videoHeight;
+                const scale = Math.max(width / vW, height / vH);
+                const sW = vW * scale;
+                const sH = vH * scale;
+                const dx = (width - sW) / 2;
+                const dy = (height - sH) / 2;
+
+                if (isFrontCamera) {
+                    // Mirror horizontally for natural selfie camera preview
+                    ctx.translate(width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(cameraVideoElement, dx, dy, sW, sH);
+                } else {
+                    ctx.drawImage(cameraVideoElement, dx, dy, sW, sH);
+                }
+                ctx.restore();
+            }
+
+            // 2. Background Media with Ken Burns Zoom & Pan (when camera is not active)
+            if (!hasLiveCamera && mediaImages.length > 0) {
                 if (imageStartTime === 0) imageStartTime = timestamp;
                 const elapsedSinceImg = timestamp - imageStartTime;
                 if (elapsedSinceImg > 8000) {
@@ -120,74 +150,97 @@ export const createReelRenderer = ({
                 }
             }
 
-            // Dark gradient overlay
+            // Dark gradient overlay for text readability
             const grad = ctx.createLinearGradient(0, 0, 0, height);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-            grad.addColorStop(0.3, 'rgba(0, 0, 0, 0.5)');
-            grad.addColorStop(0.7, 'rgba(0, 0, 0, 0.6)');
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+            if (hasLiveCamera) {
+                // Lighter gradient to show user face clearly
+                grad.addColorStop(0, 'rgba(0, 0, 0, 0.45)');
+                grad.addColorStop(0.3, 'rgba(0, 0, 0, 0.20)');
+                grad.addColorStop(0.7, 'rgba(0, 0, 0, 0.35)');
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+            } else {
+                grad.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+                grad.addColorStop(0.3, 'rgba(0, 0, 0, 0.5)');
+                grad.addColorStop(0.7, 'rgba(0, 0, 0, 0.6)');
+                grad.addColorStop(1, 'rgba(0, 0, 0, 0.85)');
+            }
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
 
-            // 1. Header Section
-            if (heading) {
-                const headerX = 60;
-                const headerY = 80;
-                const headerW = width - 120;
-                const headerH = 220;
+            // 3. Header Section (Episode / News Title)
+            const headerX = 60;
+            const headerY = 70;
+            const headerW = width - 120;
+            const headerH = 200;
 
+            if (heading) {
                 drawRoundedRect(
                     ctx,
                     headerX,
                     headerY,
                     headerW,
                     headerH,
-                    32,
-                    'rgba(20, 20, 25, 0.82)',
-                    'rgba(255, 255, 255, 0.12)'
+                    28,
+                    `rgba(15, 15, 20, ${Math.min(0.90, prompterOpacity + 0.1)})`,
+                    'rgba(255, 255, 255, 0.15)'
                 );
 
-                ctx.font = '900 48px serif';
+                ctx.font = '900 44px serif';
                 ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
                 const lines = wrapText(ctx, heading.toUpperCase(), headerW - 60);
-                const lineHeight = 58;
-                const startY = headerY + 80 - ((lines.length - 1) * lineHeight) / 2;
+                const lineHeight = 52;
+                const startY = headerY + (headerH / 2) - 15 - ((lines.length - 1) * lineHeight) / 2;
                 lines.forEach((line, idx) => {
                     ctx.fillText(line, width / 2, startY + idx * lineHeight);
                 });
 
                 // Red Accent Bar
                 ctx.fillStyle = '#dc2626';
-                drawRoundedRect(ctx, width / 2 - 80, headerY + headerH - 30, 160, 8, 4, '#dc2626', null);
+                drawRoundedRect(ctx, width / 2 - 80, headerY + headerH - 22, 160, 6, 3, '#dc2626', null);
             }
 
-            // 2. Script / Karaoke Teleprompter Section
+            // 4. Script / Karaoke Teleprompter Section
             if (graphemes.length > 0) {
-                // Update Progress based on WPM
                 const charsPerSec = (wpm * 5) / 60;
-                // Advance progress proportionally
                 currentGraphemeProgress = Math.min(
                     currentGraphemeProgress + charsPerSec / 60,
                     graphemes.length
                 );
 
                 const cardX = 60;
-                const cardY = 340;
                 const cardW = width - 120;
-                const cardH = height - 520;
+                const availableArea = height - 420; // Room for header + footer
 
+                let cardY, cardH;
+                const calculatedH = Math.max(380, Math.min(availableArea, availableArea * prompterHeight));
+
+                if (prompterMode === 'bottom') {
+                    // Lower-Third / News Ticker: Sits at the bottom of the screen
+                    cardH = Math.min(650, calculatedH);
+                    cardY = height - 160 - cardH;
+                } else if (prompterMode === 'top') {
+                    // Top Prompter (Eye contact near camera lens)
+                    cardH = Math.min(750, calculatedH);
+                    cardY = headerY + headerH + 30;
+                } else {
+                    // Center Card (Classic full studio)
+                    cardH = calculatedH;
+                    cardY = headerY + headerH + 30 + (availableArea - calculatedH) / 2;
+                }
+
+                // Draw Prompter Glass Container
                 drawRoundedRect(
                     ctx,
                     cardX,
                     cardY,
                     cardW,
                     cardH,
-                    36,
-                    'rgba(15, 15, 20, 0.75)',
-                    'rgba(255, 255, 255, 0.08)'
+                    32,
+                    `rgba(10, 10, 15, ${prompterOpacity})`,
+                    'rgba(255, 255, 255, 0.12)'
                 );
 
                 // Clip within card for scrolling
@@ -196,27 +249,28 @@ export const createReelRenderer = ({
                 ctx.rect(cardX + 20, cardY + 20, cardW - 40, cardH - 40);
                 ctx.clip();
 
-                ctx.font = '600 44px serif';
+                const activeFontSize = fontSize || 44;
+                ctx.font = `600 ${activeFontSize}px serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
 
-                const lines = wrapText(ctx, content, cardW - 120);
-                const lineHeight = 76;
-                const totalTextHeight = lines.length * lineHeight;
+                const lines = wrapText(ctx, content, cardW - 100);
+                const lineHeight = Math.round(activeFontSize * 1.68);
 
                 // Calculate which character maps to which line
                 const charRatio = currentGraphemeProgress / Math.max(1, graphemes.length);
                 const currentLineIndex = Math.min(lines.length - 1, Math.floor(charRatio * lines.length));
 
                 // Smooth vertical scrolling centering on current line
-                const targetScrollY = cardY + 120 - currentLineIndex * lineHeight;
+                const centerTargetOffset = cardH * 0.35;
+                const targetScrollY = cardY + centerTargetOffset - currentLineIndex * lineHeight;
                 const activeScrollY = targetScrollY;
 
                 let charAccumulator = 0;
 
                 lines.forEach((line, lineIdx) => {
                     const lineY = activeScrollY + lineIdx * lineHeight;
-                    if (lineY > cardY - 80 && lineY < cardY + cardH + 80) {
+                    if (lineY > cardY - 90 && lineY < cardY + cardH + 90) {
                         const lineChars = Array.from(
                             segmenter ? segmenter.segment(line) : line.split('')
                         ).map(s => typeof s === 'string' ? s : s.segment);
@@ -228,7 +282,7 @@ export const createReelRenderer = ({
                             const chWidth = ctx.measureText(ch).width;
                             const isHighlighted = charAccumulator <= currentGraphemeProgress;
 
-                            ctx.fillStyle = isHighlighted ? '#f59e0b' : 'rgba(255, 255, 255, 0.85)';
+                            ctx.fillStyle = isHighlighted ? '#f59e0b' : 'rgba(255, 255, 255, 0.88)';
                             if (isHighlighted) {
                                 ctx.shadowColor = '#d97706';
                                 ctx.shadowBlur = 10;
@@ -258,24 +312,24 @@ export const createReelRenderer = ({
                 }
             }
 
-            // 3. Footer Bar
-            const footerY = height - 120;
+            // 5. Footer Branding Bar
+            const footerY = height - 110;
             drawRoundedRect(
                 ctx,
-                width / 2 - 280,
+                width / 2 - 290,
                 footerY,
-                560,
-                54,
-                27,
-                'rgba(255, 255, 255, 0.08)',
+                580,
+                50,
+                25,
+                'rgba(15, 15, 20, 0.75)',
                 'rgba(255, 255, 255, 0.15)'
             );
             ctx.font = '800 20px sans-serif';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.shadowBlur = 0;
-            ctx.fillText('HISTORICAL ARCHIVE • STORY OF THE LEADER', width / 2, footerY + 27);
+            ctx.fillText('HISTORICAL ARCHIVE • STORY OF THE LEADER', width / 2, footerY + 25);
         }
     };
 };

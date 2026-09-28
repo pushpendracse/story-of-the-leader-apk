@@ -1,6 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, theme, isRecording, onRecordingComplete }, ref) => {
+const NewsRoom = React.forwardRef(({
+    newsData,
+    audioEnabled,
+    highlightSpeed = 110,
+    theme = 'dark',
+    isRecording,
+    onRecordingComplete,
+    cameraStream = null,
+    isFrontCamera = true,
+    prompterMode = 'center', // 'center' | 'bottom' | 'top'
+    prompterHeight = 0.55, // 0.30 to 0.85
+    prompterOpacity = 0.80, // 0.20 to 0.95
+    fontSize = 20
+}, ref) => {
     const { heading, content, mediaList, outroImage } = newsData || { heading: '', content: '', mediaList: [], outroImage: null };
     const [currentImgIdx, setCurrentImgIdx] = useState(0);
     const [phase, setPhase] = useState('heading');
@@ -8,27 +21,41 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
 
     const scrollRef = useRef(null);
     const containerRef = useRef(null);
+    const cameraVideoRef = useRef(null);
 
-    // Expose internal ref to parent
+    // Bind camera stream to local preview video element
+    useEffect(() => {
+        if (cameraVideoRef.current && cameraStream) {
+            cameraVideoRef.current.srcObject = cameraStream;
+            cameraVideoRef.current.play().catch(e => console.log("Camera preview play notice:", e));
+        }
+    }, [cameraStream]);
+
+    // Expose internal ref & video element to parent
     React.useImperativeHandle(ref, () => ({
-        container: containerRef.current
+        container: containerRef.current,
+        cameraVideo: cameraVideoRef.current
     }));
 
-    // Image Rotation Logic
+    // Image Rotation Logic (when camera is not active)
     useEffect(() => {
-        if (mediaList && mediaList.length > 1) {
+        if (!cameraStream && mediaList && mediaList.length > 1) {
             const timer = setInterval(() => {
                 setCurrentImgIdx(prev => (prev + 1) % mediaList.length);
             }, 8000);
             return () => clearInterval(timer);
         }
-    }, [mediaList]);
+    }, [mediaList, cameraStream]);
 
     // Split content into graphemes
     const graphemes = React.useMemo(() => {
         if (!content) return [];
-        const segmenter = new Intl.Segmenter('hi-IN', { granularity: 'grapheme' });
-        return Array.from(segmenter.segment(content)).map(segment => segment.segment);
+        const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+            ? new Intl.Segmenter('hi-IN', { granularity: 'grapheme' })
+            : null;
+        return segmenter
+            ? Array.from(segmenter.segment(content)).map(segment => segment.segment)
+            : content.split('');
     }, [content]);
 
     const progressRef = useRef(0);
@@ -39,22 +66,10 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
     const animate = (time) => {
         if (lastFrameTime.current !== 0) {
             const deltaTime = time - lastFrameTime.current;
-            
-            // "MAKHAN OPTIMIZATION": Clamp delta time to max 15ms.
-            // If the browser lags (e.g. 100ms frame time due to recording),
-            // we ONLY advance the highlight by 15ms visually.
-            // This prevents "Jumping/Teleporting" and ensures smooth flow.
             const clampedDelta = Math.min(deltaTime, 50);
 
-            // WPM LOGIC:
-            // highlightSpeed is now WPM (100-400).
-            // Average word length = 5 chars (standard).
-            // Chars Per Minute = WPM * 5.
-            // Chars Per Second = (WPM * 5) / 60.
-            const wpm = highlightSpeed || 150; // Reduced default speed to make it slower
+            const wpm = highlightSpeed || 110;
             const charsPerSecond = (wpm * 5) / 60;
-
-            // Increment based on time elapsed (sec/1000) * speed (chars/sec)
             const increment = (clampedDelta / 1000) * charsPerSecond;
 
             progressRef.current = Math.min(progressRef.current + increment, graphemes.length);
@@ -64,20 +79,19 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
                 containerRef.current.style.setProperty('--progress', currentProgress);
             }
 
-            // Ultra-smooth pixel-by-pixel scrolling - very slow movement
+            // Smooth scrolling centered on active reading character
             if (scrollRef.current && containerRef.current) {
                 const charElements = containerRef.current.querySelectorAll('.char-span');
                 const activeChar = charElements[Math.floor(currentProgress)];
 
                 if (activeChar) {
-                    const targetScroll = activeChar.offsetTop - 250;
-                    const currentScroll = scrollRef.current.scrollTop;
+                    const scrollContainer = scrollRef.current;
+                    const targetScroll = activeChar.offsetTop - (scrollContainer.clientHeight * 0.35);
+                    const currentScroll = scrollContainer.scrollTop;
                     const scrollDiff = targetScroll - currentScroll;
 
-                    // Very gradual scrolling for ultra-smooth movement
-                    if (Math.abs(scrollDiff) > 0.1) {
-                        // Move only a tiny fraction to make it extremely slow
-                        scrollRef.current.scrollTop += scrollDiff * 0.1;
+                    if (Math.abs(scrollDiff) > 0.5) {
+                        scrollContainer.scrollTop += scrollDiff * 0.12;
                     }
                 }
             }
@@ -96,7 +110,8 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
             setCurrentImgIdx(0);
             setPhase('heading');
             setShowOutro(false);
-            setTimeout(() => setPhase('content'), 1000);
+            const timer = setTimeout(() => setPhase('content'), 1000);
+            return () => clearTimeout(timer);
         }
     }, [content, heading]);
 
@@ -130,11 +145,24 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
     }, [graphemes.length, isRecording, outroImage, showOutro, onRecordingComplete]);
 
     const isLight = theme === 'light';
-    const containerBg = isLight ? 'bg-white' : 'bg-black';
+    const containerBg = isLight ? 'bg-neutral-100' : 'bg-black';
     const textColor = isLight ? 'text-black' : 'text-white';
-    const overlayGradient = isLight ? 'from-white/60 via-transparent to-white/80' : 'from-black/60 via-transparent to-black/80';
-    const glassBg = isLight ? 'bg-white/10 border-black/5' : 'bg-black/10 border-white/5';
-    const headerFooterBg = isLight ? 'bg-white/60 border-black/10' : 'bg-black/60 border-white/10';
+    const overlayGradient = isLight
+        ? 'from-white/70 via-transparent to-white/90'
+        : (cameraStream ? 'from-black/50 via-transparent to-black/75' : 'from-black/60 via-transparent to-black/85');
+    const headerFooterBg = isLight ? 'bg-white/75 border-black/10' : 'bg-black/75 border-white/10';
+
+    // Prompter Alignment based on mode
+    let prompterPositionClasses = 'justify-center items-center';
+    let cardMaxHeightStyle = `${Math.round(prompterHeight * 100)}%`;
+
+    if (prompterMode === 'bottom') {
+        prompterPositionClasses = 'justify-end items-center pb-24';
+        cardMaxHeightStyle = `${Math.min(48, Math.round(prompterHeight * 100))}%`;
+    } else if (prompterMode === 'top') {
+        prompterPositionClasses = 'justify-start items-center pt-2';
+        cardMaxHeightStyle = `${Math.min(52, Math.round(prompterHeight * 100))}%`;
+    }
 
     return (
         <div
@@ -142,7 +170,7 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
             id="newsroom-container"
             className={`relative flex flex-col overflow-hidden font-serif shadow-2xl transition-all duration-300 ${isRecording
                 ? 'w-auto h-full aspect-[9/16] border-0'
-                : 'w-full h-[100dvh] md:w-[360px] md:h-[640px] md:border-[6px] border-black'
+                : 'w-full h-[100dvh] md:w-[380px] md:h-[680px] md:rounded-3xl md:border-[6px] border-neutral-900'
                 } ${containerBg}`}
         >
             {/* Outro Overlay */}
@@ -152,34 +180,61 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
                 </div>
             )}
 
-            {/* Background Layer */}
-            {mediaList && mediaList.length > 0 && (
+            {/* Layer 1: Live Front/Back Camera Stream */}
+            {cameraStream && (
+                <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+                    <video
+                        ref={cameraVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover ${isFrontCamera ? '-scale-x-100' : ''}`}
+                    />
+                </div>
+            )}
+
+            {/* Layer 2: Background Images (when camera is OFF) */}
+            {!cameraStream && mediaList && mediaList.length > 0 && (
                 <div className="absolute inset-0 z-0 overflow-hidden">
                     <div
                         key={currentImgIdx}
                         className="w-full h-full bg-cover bg-center opacity-100 animate-ken-burns transition-all duration-1000"
                         style={{ backgroundImage: `url(${mediaList[currentImgIdx]})` }}
                     ></div>
-                    <div className={`absolute inset-0 bg-gradient-to-b ${overlayGradient}`}></div>
                 </div>
             )}
 
-            {/* Header */}
-            <div className={`p-6 pb-4 backdrop-blur-md z-30 border-b mx-4 mt-4 rounded-xl shadow-lg ${headerFooterBg} ${isLight ? 'border-gray-200' : 'border-white/10'}`}>
-                <h1 className={`text-xl font-black text-center uppercase leading-tight line-clamp-2 drop-shadow-md ${textColor}`}>{heading}</h1>
-                <div className="h-[4px] w-16 bg-red-600 mt-3 mx-auto rounded-full shadow-red-500/50 shadow-lg"></div>
+            {/* Layer 3: Dark contrast gradient overlay */}
+            <div className={`absolute inset-0 z-10 bg-gradient-to-b ${overlayGradient} pointer-events-none`}></div>
+
+            {/* Header Section */}
+            <div className={`relative p-4 pb-3 backdrop-blur-md z-30 border-b mx-3 mt-3 rounded-2xl shadow-xl ${headerFooterBg} ${isLight ? 'border-gray-300' : 'border-white/10'}`}>
+                <h1 className={`text-base md:text-lg font-black text-center uppercase leading-tight line-clamp-2 drop-shadow-md tracking-tight ${textColor}`}>
+                    {heading}
+                </h1>
+                <div className="h-[3px] w-14 bg-red-600 mt-2 mx-auto rounded-full shadow-red-500/50 shadow-md"></div>
             </div>
 
-            {/* Content Area */}
-            <div ref={scrollRef} className="flex-grow px-4 overflow-y-auto pt-8 pb-32 no-scrollbar z-20 relative">
-                <div className={`p-4 rounded-2xl border shadow-2xl mx-2 my-4 ${glassBg}`}>
-                    <div className={`text-[18px] text-center leading-[1.8] relative whitespace-pre-wrap drop-shadow-sm ${textColor}`}>
+            {/* Content / Prompter Area with Adjustable Mode and Height */}
+            <div className={`flex-grow px-3 overflow-hidden z-20 relative flex flex-col ${prompterPositionClasses}`}>
+                <div
+                    ref={scrollRef}
+                    style={{
+                        maxHeight: cardMaxHeightStyle,
+                        backgroundColor: isLight ? `rgba(255, 255, 255, ${prompterOpacity})` : `rgba(12, 12, 18, ${prompterOpacity})`
+                    }}
+                    className={`w-full p-4 rounded-3xl border shadow-2xl overflow-y-auto no-scrollbar backdrop-blur-md transition-all duration-300 ${isLight ? 'border-black/10' : 'border-white/15'}`}
+                >
+                    <div
+                        style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
+                        className={`text-center relative whitespace-pre-wrap drop-shadow-sm font-semibold ${textColor}`}
+                    >
                         {graphemes.map((char, i) => (
                             <span
                                 key={i}
                                 className="char-span relative"
                                 style={{
-                                    backgroundImage: `linear-gradient(to right, #e88c0a calc((var(--progress, 0) - ${i}) * 100%), transparent 0%)`,
+                                    backgroundImage: `linear-gradient(to right, #f59e0b calc((var(--progress, 0) - ${i}) * 100%), transparent 0%)`,
                                     backgroundClip: 'padding-box',
                                     WebkitBackgroundClip: 'padding-box',
                                     display: 'inline',
@@ -195,9 +250,9 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
                 </div>
             </div>
 
-            {/* Footer */}
-            <div className={`absolute bottom-0 w-full h-20 backdrop-blur-md border-t flex items-center justify-center z-30 ${headerFooterBg}`}>
-                <div className={`border px-4 py-1 rounded text-[10px] font-sans tracking-widest uppercase font-bold ${isLight ? 'border-black/30 text-gray-600 bg-black/5' : 'border-white/30 text-gray-300 bg-white/5'}`}>
+            {/* Footer Branding Bar */}
+            <div className={`relative bottom-0 w-full h-14 backdrop-blur-md border-t flex items-center justify-center z-30 ${headerFooterBg}`}>
+                <div className={`border px-3 py-1 rounded-full text-[9px] font-sans tracking-widest uppercase font-black ${isLight ? 'border-black/30 text-gray-700 bg-black/5' : 'border-white/30 text-gray-300 bg-white/5'}`}>
                     Historical Archive • StoryOfTheLeader
                 </div>
             </div>
@@ -206,12 +261,12 @@ const NewsRoom = React.forwardRef(({ newsData, audioEnabled, highlightSpeed, the
                 __html: `
                 @keyframes kenburns {
                     0% { transform: scale(1) translate(0, 0); }
-                    50% { transform: scale(1.2) translate(-15px, -10px); }
+                    50% { transform: scale(1.15) translate(-10px, -8px); }
                     100% { transform: scale(1) translate(0, 0); }
                 }
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
-                .animate-ken-burns { animation: kenburns 15s ease-in-out infinite; }
+                .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+                .animate-ken-burns { animation: kenburns 14s ease-in-out infinite; }
                 .no-scrollbar::-webkit-scrollbar { display: none; }
             `}} />
         </div>

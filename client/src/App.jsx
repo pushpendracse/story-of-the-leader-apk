@@ -4,6 +4,7 @@ import ControlPanel from './components/ControlPanel';
 import { createReelRenderer } from './utils/canvasRenderer';
 import { saveReelVideo } from './utils/nativeFileSaver';
 import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 
 const App = () => {
     const [news, setNews] = useState({
@@ -13,13 +14,27 @@ const App = () => {
         outroImage: null,
     });
     const [audioEnabled, setAudioEnabled] = useState(false);
-    const [liveSpeed, setLiveSpeed] = useState(50);
+    const [liveSpeed, setLiveSpeed] = useState(105); // Standard smooth reading WPM
 
     const [isRecordingMode, setIsRecordingMode] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
-    const [micEnabled, setMicEnabled] = useState(false);
+    const [micEnabled, setMicEnabled] = useState(true); // Default mic ON for video recording
     const [systemAudioEnabled, setSystemAudioEnabled] = useState(true);
     const [recordingStatus, setRecordingStatus] = useState("");
+
+    // Live Camera States
+    const [cameraEnabled, setCameraEnabled] = useState(false);
+    const [isFrontCamera, setIsFrontCamera] = useState(true);
+    const [cameraStream, setCameraStream] = useState(null);
+
+    // Prompter Screen Customization States
+    const [prompterMode, setPrompterMode] = useState('center'); // 'center' | 'bottom' | 'top'
+    const [prompterHeight, setPrompterHeight] = useState(0.50); // 0.35 | 0.50 | 0.70
+    const [prompterOpacity, setPrompterOpacity] = useState(0.80);
+    const [fontSize, setFontSize] = useState(22);
+
+    // Export & Share Modal State
+    const [exportedVideo, setExportedVideo] = useState(null); // { url, blob, fileName, uri }
 
     const [showControls, setShowControls] = useState(true);
     const [controlsTimeout, setControlsTimeout] = useState(null);
@@ -32,6 +47,7 @@ const App = () => {
     const newsRoomRef = useRef(null);
     const animationFrameRef = useRef(null);
     const activeStreamRef = useRef(null);
+    const cameraVideoRef = useRef(null);
 
     const [draftNews, setDraftNews] = useState({
         heading: "Breaking News: Story of the Leader",
@@ -39,6 +55,44 @@ const App = () => {
         mediaList: [],
         outroImage: null
     });
+
+    // Camera Stream Management
+    useEffect(() => {
+        let stream = null;
+        if (cameraEnabled) {
+            const constraints = {
+                video: {
+                    facingMode: isFrontCamera ? 'user' : 'environment',
+                    width: { ideal: 1080 },
+                    height: { ideal: 1920 }
+                },
+                audio: micEnabled
+            };
+            navigator.mediaDevices?.getUserMedia(constraints)
+                .then(s => {
+                    stream = s;
+                    setCameraStream(s);
+                    if (cameraVideoRef.current) {
+                        cameraVideoRef.current.srcObject = s;
+                        cameraVideoRef.current.play().catch(e => console.log("Cam play err:", e));
+                    }
+                })
+                .catch(err => {
+                    console.error("Camera access error:", err);
+                    alert("Camera Permission Required: " + err.message);
+                    setCameraEnabled(false);
+                });
+        } else {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(t => t.stop());
+                setCameraStream(null);
+            }
+        }
+
+        return () => {
+            if (stream) stream.getTracks().forEach(t => t.stop());
+        };
+    }, [cameraEnabled, isFrontCamera]);
 
     const resetControlsTimeout = () => {
         setShowControls(true);
@@ -73,7 +127,7 @@ const App = () => {
     };
 
     // ===============================================
-    // UNIFIED RECORDING ENGINE (MOBILE APK + DESKTOP)
+    // UNIFIED RECORDING ENGINE (HD CANVAS + CAMERA + AUDIO)
     // ===============================================
     const startRecording = async () => {
         try {
@@ -84,15 +138,12 @@ const App = () => {
             setActiveTab('preview');
             setRecordingStatus("PREPARING STUDIO...");
 
-            // If running on Android APK or getDisplayMedia is unavailable, use Direct Canvas Synthesis
-            const useDirectCanvas = isNative || !hasDisplayMedia || window.innerWidth < 768;
-
+            const useDirectCanvas = true; // Use 1080x1920 Direct Canvas Engine for guaranteed HD across all devices & APK
             let finalStream;
             let canvas = null;
 
             if (useDirectCanvas) {
-                // Direct Canvas Engine (Android APK Safe & 1080x1920 Native)
-                setRecordingStatus("LOADING ASSETS...");
+                setRecordingStatus("INITIALIZING HD CANVAS...");
                 canvas = document.createElement('canvas');
                 canvas.width = 1080;
                 canvas.height = 1920;
@@ -112,7 +163,13 @@ const App = () => {
                     mediaImages: mediaImages.filter(Boolean),
                     outroImage: outroImg,
                     wpm: liveSpeed,
-                    theme: theme
+                    theme: theme,
+                    cameraVideoElement: cameraVideoRef.current,
+                    isFrontCamera: isFrontCamera,
+                    prompterMode: prompterMode,
+                    prompterHeight: prompterHeight,
+                    prompterOpacity: prompterOpacity,
+                    fontSize: fontSize * 2 // Scaled for 1080p canvas resolution
                 });
 
                 let startTime = null;
@@ -132,88 +189,24 @@ const App = () => {
                 activeStreamRef.current = canvasStream;
                 finalStream = canvasStream;
 
-                // Add microphone if enabled
-                if (micEnabled) {
+                // Add audio: Camera audio track or dedicated microphone track
+                let audioStream = null;
+                if (cameraStream && cameraStream.getAudioTracks().length > 0) {
+                    audioStream = cameraStream;
+                } else if (micEnabled) {
                     try {
-                        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        finalStream = new MediaStream([
-                            ...canvasStream.getVideoTracks(),
-                            ...micStream.getAudioTracks()
-                        ]);
+                        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     } catch (e) {
                         console.warn("Microphone not available:", e);
                     }
                 }
 
-            } else {
-                // Desktop Tab Capture Mode
-                setRecordingStatus("AWAITING SHARE...");
-                const displayStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } },
-                    audio: systemAudioEnabled,
-                    preferCurrentTab: true
-                });
-
-                canvas = document.createElement('canvas');
-                canvas.width = 1080;
-                canvas.height = 1920;
-                const ctx = canvas.getContext('2d', { alpha: false });
-                ctx.imageSmoothingEnabled = true;
-
-                const video = document.createElement('video');
-                video.muted = true;
-                video.playsInline = true;
-                video.srcObject = displayStream;
-
-                await new Promise((resolve) => {
-                    const onReady = () => video.play().then(resolve);
-                    if (video.readyState >= 2) onReady();
-                    else video.onloadeddata = onReady;
-                });
-
-                const drawFrame = () => {
-                    if (!video || video.paused || video.ended) return;
-                    const newsRoomEl = document.getElementById('newsroom-container');
-                    const rect = newsRoomEl?.getBoundingClientRect();
-
-                    if (rect && video.videoWidth > 0) {
-                        const scaleX = video.videoWidth / window.innerWidth;
-                        const scaleY = video.videoHeight / window.innerHeight;
-                        ctx.drawImage(video, rect.left * scaleX, rect.top * scaleY, rect.width * scaleX, rect.height * scaleY, 0, 0, canvas.width, canvas.height);
-                    }
-                    animationFrameRef.current = requestAnimationFrame(drawFrame);
-                };
-                drawFrame();
-
-                const canvasStream = canvas.captureStream(60);
-                finalStream = canvasStream;
-                activeStreamRef.current = displayStream;
-
-                const systemAudio = displayStream.getAudioTracks();
-                if (micEnabled || (systemAudioEnabled && systemAudio.length > 0)) {
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    const dest = audioCtx.createMediaStreamDestination();
-
-                    if (systemAudio.length > 0) {
-                        const sysSource = audioCtx.createMediaStreamSource(new MediaStream([systemAudio[0]]));
-                        sysSource.connect(dest);
-                    }
-
-                    if (micEnabled) {
-                        try {
-                            const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-                            const micSource = audioCtx.createMediaStreamSource(mic);
-                            micSource.connect(dest);
-                        } catch (e) { console.warn("Mic Permission Denied", e); }
-                    }
-
-                    finalStream = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
-                    audioContextRef.current = audioCtx;
+                if (audioStream && audioStream.getAudioTracks().length > 0) {
+                    finalStream = new MediaStream([
+                        ...canvasStream.getVideoTracks(),
+                        ...audioStream.getAudioTracks()
+                    ]);
                 }
-
-                displayStream.getVideoTracks()[0].onended = () => {
-                    stopRecording();
-                };
             }
 
             // Codec Selection: Universal MP4 First + Lightweight Full HD (1080p) Bitrate
@@ -250,11 +243,23 @@ const App = () => {
             recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
 
             recorder.onstop = async () => {
-                setRecordingStatus("SAVING HD VIDEO...");
+                setRecordingStatus("PROCESSING HD VIDEO...");
                 if (chunksRef.current.length > 0) {
                     const mimeType = selectedCodec.mime || chunksRef.current[0].type || 'video/mp4';
                     const blob = new Blob(chunksRef.current, { type: mimeType });
-                    await saveReelVideo(blob, selectedCodec.ext);
+                    const blobUrl = URL.createObjectURL(blob);
+
+                    // Save locally to device cache & documents
+                    const saveResult = await saveReelVideo(blob, selectedCodec.ext);
+
+                    // Open Ready Modal with Player, Save & Share options
+                    setExportedVideo({
+                        url: blobUrl,
+                        blob: blob,
+                        fileName: saveResult.fileName || `STORY_REEL_${Date.now()}.${selectedCodec.ext}`,
+                        uri: saveResult.uri || null,
+                        sizeMb: (blob.size / (1024 * 1024)).toFixed(1)
+                    });
                 }
                 setIsRecording(false);
                 setIsRecordingMode(false);
@@ -290,10 +295,70 @@ const App = () => {
         }
     };
 
+    // Share Handler from Modal
+    const handleShareVideo = async () => {
+        if (!exportedVideo) return;
+        try {
+            const canShare = await Share.canShare().then(r => r.value).catch(() => false);
+            if (canShare && exportedVideo.uri) {
+                await Share.share({
+                    title: 'Story of the Leader - HD Reel',
+                    text: 'Watch my 1080p HD vertical story reel!',
+                    url: exportedVideo.uri,
+                    dialogTitle: 'Share HD Video'
+                });
+            } else if (navigator.share) {
+                const file = new File([exportedVideo.blob], exportedVideo.fileName, { type: exportedVideo.blob.type });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Story of the Leader - HD Reel',
+                        text: 'Watch my 1080p HD vertical story reel!'
+                    });
+                } else {
+                    await navigator.share({
+                        title: 'Story of the Leader - HD Reel',
+                        url: window.location.href
+                    });
+                }
+            } else {
+                // Fallback direct download
+                const a = document.createElement('a');
+                a.href = exportedVideo.url;
+                a.download = exportedVideo.fileName;
+                a.click();
+            }
+        } catch (e) {
+            console.log("Share cancelled or failed:", e);
+        }
+    };
+
+    // Download Handler from Modal
+    const handleDownloadVideo = () => {
+        if (!exportedVideo) return;
+        const a = document.createElement('a');
+        a.href = exportedVideo.url;
+        a.download = exportedVideo.fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            if (a.parentNode) document.body.removeChild(a);
+        }, 1500);
+    };
+
     return (
         <div className={`w-full h-screen bg-neutral-950 flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
 
-            {/* Mobile Tab Navigation Bar (Visible only on small screens when not recording) */}
+            {/* Hidden Offscreen Video Element for Live Camera Synthesis onto Canvas */}
+            <video
+                ref={cameraVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="hidden pointer-events-none"
+            />
+
+            {/* Mobile Tab Navigation Bar */}
             {!isRecordingMode && (
                 <div className="md:hidden flex bg-neutral-900 border-b border-neutral-800 z-40 p-2 gap-2">
                     <button
@@ -312,7 +377,62 @@ const App = () => {
             )}
 
             {/* Main Stage / Teleprompter Canvas */}
-            <div className={`transition-all duration-700 ease-in-out flex justify-center items-center ${isRecordingMode ? 'w-full h-full absolute inset-0 z-[100] bg-black' : activeTab === 'preview' ? 'flex-1 h-full' : 'hidden md:flex flex-1 h-full'}`}>
+            <div className={`transition-all duration-700 ease-in-out flex flex-col justify-center items-center relative ${isRecordingMode ? 'w-full h-full absolute inset-0 z-[100] bg-black' : activeTab === 'preview' ? 'flex-1 h-full' : 'hidden md:flex flex-1 h-full'}`}>
+
+                {/* Quick Floating Top Bar (Controls for Speed, Camera & Mode right on screen) */}
+                {!isRecordingMode && (
+                    <div className="absolute top-3 z-30 flex items-center gap-2 bg-neutral-900/90 backdrop-blur-xl px-3 py-1.5 rounded-2xl border border-neutral-800 shadow-xl max-w-[95%] overflow-x-auto no-scrollbar">
+                        {/* Camera Quick Toggle */}
+                        <button
+                            onClick={() => setCameraEnabled(!cameraEnabled)}
+                            className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 transition-all ${cameraEnabled ? 'bg-emerald-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}
+                        >
+                            📷 {cameraEnabled ? 'Cam ON' : 'Cam OFF'}
+                        </button>
+
+                        {/* Front / Back switch */}
+                        {cameraEnabled && (
+                            <button
+                                onClick={() => setIsFrontCamera(!isFrontCamera)}
+                                className="px-2 py-1 rounded-xl text-[10px] font-bold bg-neutral-800 text-neutral-300"
+                            >
+                                🔄 {isFrontCamera ? 'Front' : 'Back'}
+                            </button>
+                        )}
+
+                        {/* Speed Stepper */}
+                        <div className="flex items-center gap-1 bg-neutral-800/80 px-2 py-0.5 rounded-xl border border-neutral-700/60">
+                            <button
+                                onClick={() => setLiveSpeed(prev => Math.max(30, prev - 5))}
+                                className="text-yellow-500 font-black text-xs px-1 hover:text-white"
+                            >
+                                -
+                            </button>
+                            <span className="text-[10px] font-black text-yellow-400 min-w-12 text-center">
+                                {liveSpeed} WPM
+                            </span>
+                            <button
+                                onClick={() => setLiveSpeed(prev => Math.min(260, prev + 5))}
+                                className="text-yellow-500 font-black text-xs px-1 hover:text-white"
+                            >
+                                +
+                            </button>
+                        </div>
+
+                        {/* Prompter Mode Quick Picker */}
+                        <div className="flex gap-1 bg-neutral-800/80 p-0.5 rounded-xl">
+                            {['center', 'bottom', 'top'].map(m => (
+                                <button
+                                    key={m}
+                                    onClick={() => setPrompterMode(m)}
+                                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${prompterMode === m ? 'bg-yellow-500 text-black' : 'text-neutral-400'}`}
+                                >
+                                    {m === 'center' ? 'Center' : m === 'bottom' ? 'Ticker' : 'Top'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <NewsRoom
                     ref={newsRoomRef}
@@ -322,6 +442,12 @@ const App = () => {
                     theme={theme}
                     isRecording={isRecordingMode}
                     onRecordingComplete={stopRecording}
+                    cameraStream={cameraStream}
+                    isFrontCamera={isFrontCamera}
+                    prompterMode={prompterMode}
+                    prompterHeight={prompterHeight}
+                    prompterOpacity={prompterOpacity}
+                    fontSize={fontSize}
                 />
 
                 {isRecordingMode && (
@@ -337,12 +463,12 @@ const App = () => {
                                     onClick={stopRecording}
                                     className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-2xl shadow-2xl border border-red-400 active:scale-95 transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
                                 >
-                                    <span>⏹</span> STOP & SAVE
+                                    <span>⏹</span> STOP & EXPORT REEL
                                 </button>
                             ) : (
                                 <button
                                     onClick={() => setIsRecordingMode(false)}
-                                    className="bg-gray-800/80 hover:bg-gray-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-gray-600"
+                                    className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-neutral-700"
                                 >
                                     Exit Studio
                                 </button>
@@ -353,7 +479,7 @@ const App = () => {
             </div>
 
             {/* Control Panel Drawer */}
-            <div className={`transition-all duration-500 ${isRecordingMode ? 'hidden' : activeTab === 'controls' ? 'w-full flex-1 md:w-80 md:flex-none' : 'hidden md:block w-80'}`}>
+            <div className={`transition-all duration-500 ${isRecordingMode ? 'hidden' : activeTab === 'controls' ? 'w-full flex-1 md:w-88 md:flex-none' : 'hidden md:block w-88'}`}>
                 <ControlPanel
                     draftNews={draftNews}
                     setDraftNews={setDraftNews}
@@ -370,8 +496,81 @@ const App = () => {
                     systemAudioEnabled={systemAudioEnabled}
                     setSystemAudioEnabled={setSystemAudioEnabled}
                     recordingStatus={recordingStatus}
+                    cameraEnabled={cameraEnabled}
+                    setCameraEnabled={setCameraEnabled}
+                    isFrontCamera={isFrontCamera}
+                    setIsFrontCamera={setIsFrontCamera}
+                    prompterMode={prompterMode}
+                    setPrompterMode={setPrompterMode}
+                    prompterHeight={prompterHeight}
+                    setPrompterHeight={setPrompterHeight}
+                    prompterOpacity={prompterOpacity}
+                    setPrompterOpacity={setPrompterOpacity}
+                    fontSize={fontSize}
+                    setFontSize={setFontSize}
                 />
             </div>
+
+            {/* ======================================================== */}
+            {/* RECORDED VIDEO READY MODAL (PREVIEW + SAVE + SHARE)     */}
+            {/* ======================================================== */}
+            {exportedVideo && (
+                <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl flex flex-col items-center">
+                        <div className="w-full flex justify-between items-center pb-2 border-b border-neutral-800">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
+                                <span className="text-xs font-black text-white uppercase tracking-wider">
+                                    HD Reel Exported!
+                                </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/30">
+                                1080p MP4 • {exportedVideo.sizeMb} MB
+                            </span>
+                        </div>
+
+                        {/* Video Player */}
+                        <div className="w-full aspect-[9/16] max-h-[50vh] bg-black rounded-2xl overflow-hidden border border-neutral-800 shadow-inner flex items-center justify-center">
+                            <video
+                                src={exportedVideo.url}
+                                controls
+                                autoPlay
+                                loop
+                                playsInline
+                                className="w-full h-full object-contain"
+                            />
+                        </div>
+
+                        <p className="text-[11px] text-neutral-400 text-center">
+                            Your vertical reel is saved in Full HD MP4 and ready to post on Instagram Reels, YouTube Shorts, or WhatsApp!
+                        </p>
+
+                        {/* Actions */}
+                        <div className="w-full space-y-2">
+                            <button
+                                onClick={handleShareVideo}
+                                className="w-full py-3.5 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-2xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20 active:scale-98 transition-all"
+                            >
+                                📤 Share to WhatsApp / Instagram
+                            </button>
+
+                            <button
+                                onClick={handleDownloadVideo}
+                                className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-neutral-700 active:scale-98 transition-all"
+                            >
+                                💾 Download / Save to Phone
+                            </button>
+
+                            <button
+                                onClick={() => setExportedVideo(null)}
+                                className="w-full py-2 text-neutral-500 hover:text-neutral-300 font-bold text-xs uppercase tracking-wider transition-all"
+                            >
+                                ✕ Close & Record Another
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
