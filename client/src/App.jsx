@@ -362,7 +362,7 @@ const App = () => {
                             data: base64Data,
                             directory: Directory.Documents
                         });
-                        alert('✅ SUCCESS: Video has been downloaded to your phone\\'s "Documents" folder!');
+                        alert("✅ SUCCESS: Video has been downloaded to your phone's Documents folder!");
                     } catch (err) {
                         alert('⚠️ Save failed: ' + err.message);
                     }
