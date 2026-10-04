@@ -29,7 +29,7 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             const writeResult = await Filesystem.writeFile({
                 path: fileName,
                 data: base64Data,
-                directory: Directory.Cache
+                directory: 'CACHE' // Hardcoded string bypasses Enum undefined bug
             });
 
             // 2. Also save to Documents directory for permanent device storage
@@ -37,7 +37,7 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                 await Filesystem.writeFile({
                     path: fileName,
                     data: base64Data,
-                    directory: Directory.Documents
+                    directory: 'DOCUMENTS' // Hardcoded string bypasses Enum undefined bug
                 });
             } catch (storageErr) {
                 console.log("Documents directory save optional notice:", storageErr);
