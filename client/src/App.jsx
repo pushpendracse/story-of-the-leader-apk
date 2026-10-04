@@ -5,6 +5,7 @@ import { createReelRenderer } from './utils/canvasRenderer';
 import { saveReelVideo } from './utils/nativeFileSaver';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 const App = () => {
     const [news, setNews] = useState({
@@ -348,12 +349,16 @@ const App = () => {
         if (!exportedVideo) return;
         if (Capacitor.isNativePlatform()) {
             try {
-                const { Filesystem, Directory } = await import('@capacitor/filesystem');
                 const reader = new FileReader();
                 reader.readAsDataURL(exportedVideo.blob);
                 reader.onloadend = async () => {
                     try {
-                        const base64Data = reader.result.split(',')[1];
+                        const res = reader.result;
+                        if (!res) throw new Error("File conversion failed");
+                        
+                        const base64Data = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
+                        if (!base64Data) throw new Error("Invalid base64 encoding");
+
                         await Filesystem.writeFile({
                             path: exportedVideo.fileName,
                             data: base64Data,
