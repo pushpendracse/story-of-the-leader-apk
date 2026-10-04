@@ -25,22 +25,37 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             reader.readAsDataURL(blob);
             const base64Data = await base64Promise;
 
-            // 1. Save to Cache directory for instant system sharing
-            const writeResult = await Filesystem.writeFile({
-                path: fileName,
-                data: base64Data,
-                directory: 'CACHE' // Hardcoded string bypasses Enum undefined bug
-            });
+            // 1. Save to App Data directory for reliable cross-app sharing (WhatsApp)
+            const CHUNK_SIZE = 1024 * 1024 * 2;
+            let finalUri = null;
+            
+            for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
+                const chunk = base64Data.slice(i, i + CHUNK_SIZE);
+                if (i === 0) {
+                    const writeResult = await Filesystem.writeFile({
+                        path: fileName,
+                        data: chunk,
+                        directory: 'DATA'
+                    });
+                    finalUri = writeResult.uri;
+                } else {
+                    await Filesystem.appendFile({
+                        path: fileName,
+                        data: chunk,
+                        directory: 'DATA'
+                    });
+                }
+            }
 
             // 2. Also save to Documents directory for permanent device storage
             try {
                 await Filesystem.writeFile({
                     path: fileName,
-                    data: base64Data,
-                    directory: 'DOCUMENTS' // Hardcoded string bypasses Enum undefined bug
+                    data: base64Data, // Save the whole thing to Documents directly
+                    directory: 'DOCUMENTS'
                 });
             } catch (storageErr) {
-                console.log("Documents directory save optional notice:", storageErr);
+                console.log("Documents save notice:", storageErr);
             }
 
             // 3. Open Native Share sheet so user can save directly to Gallery, WhatsApp, or Drive
@@ -50,14 +65,14 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                     await Share.share({
                         title: 'Story of the Leader - HD Reel',
                         text: 'Your 1080p HD vertical story reel is ready!',
-                        url: writeResult.uri,
+                        url: finalUri,
                         dialogTitle: 'Save Video to Gallery / Share'
                     });
                 } catch (shareErr) {
                     console.log("Share sheet dismissed or error:", shareErr);
                 }
             }
-            return { success: true, uri: writeResult.uri, fileName };
+            return { success: true, uri: finalUri, fileName };
         } catch (error) {
             console.error("Capacitor native save error, using browser fallback:", error);
             // Alert user so we actually know if it failed here instead of silently falling back

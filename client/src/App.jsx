@@ -349,18 +349,26 @@ const App = () => {
         if (!exportedVideo) return;
         if (Capacitor.isNativePlatform()) {
             try {
-                if (exportedVideo.uri) {
-                    await Share.share({
-                        title: 'Save Video',
-                        text: 'Please select "Save to Gallery" or "Copy to..." to choose a folder.',
-                        url: exportedVideo.uri,
-                        dialogTitle: 'Select Save Location'
-                    });
-                } else {
-                    alert('⚠️ Could not find the video file on device.');
-                }
+                const reader = new FileReader();
+                reader.readAsDataURL(exportedVideo.blob);
+                reader.onloadend = async () => {
+                    try {
+                        const res = reader.result;
+                        const base64Data = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
+                        if (!base64Data) throw new Error("Base64 encoding failed");
+
+                        await Filesystem.writeFile({
+                            path: exportedVideo.fileName,
+                            data: base64Data,
+                            directory: Directory.Documents
+                        });
+                        alert('✅ SUCCESS: Video has been downloaded to your phone\\'s "Documents" folder!');
+                    } catch (err) {
+                        alert('⚠️ Save failed: ' + err.message);
+                    }
+                };
             } catch (e) {
-                console.log('Save prompt dismissed or failed:', e);
+                alert('⚠️ Download error: ' + e.message);
             }
         } else {
             const a = document.createElement('a');
