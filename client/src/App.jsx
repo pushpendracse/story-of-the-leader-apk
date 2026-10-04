@@ -246,8 +246,8 @@ const App = () => {
             }
 
             const recorderOptions = {
-                videoBitsPerSecond: 4500000,
-                audioBitsPerSecond: 128000
+                videoBitsPerSecond: 12000000, // 12 Mbps for Ultra HD
+                audioBitsPerSecond: 256000    // 256 kbps for HQ Audio
             };
             if (selectedCodec.mime) {
                 recorderOptions.mimeType = selectedCodec.mime;
@@ -355,12 +355,11 @@ const App = () => {
                     try {
                         const base64Data = reader.result.split(',')[1];
                         await Filesystem.writeFile({
-                            path: `StoryOfTheLeader/${exportedVideo.fileName}`,
+                            path: exportedVideo.fileName,
                             data: base64Data,
-                            directory: Directory.Documents,
-                            recursive: true
+                            directory: Directory.Documents
                         });
-                        alert('✅ Video successfully saved to Documents/StoryOfTheLeader folder!');
+                        alert('✅ Video successfully saved to your Documents folder!');
                     } catch (e) {
                         alert('⚠️ Could not save video: ' + e.message);
                     }

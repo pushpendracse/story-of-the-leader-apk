@@ -35,10 +35,9 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             // 2. Also save to Documents directory for permanent device storage
             try {
                 await Filesystem.writeFile({
-                    path: `StoryOfTheLeader/${fileName}`,
+                    path: fileName,
                     data: base64Data,
-                    directory: Directory.Documents,
-                    recursive: true
+                    directory: Directory.Documents
                 });
             } catch (storageErr) {
                 console.log("Documents directory save optional notice:", storageErr);
