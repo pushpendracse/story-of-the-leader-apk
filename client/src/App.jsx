@@ -144,7 +144,9 @@ const App = () => {
         return new Promise((resolve) => {
             if (!src) return resolve(null);
             const img = new Image();
-            img.crossOrigin = 'anonymous';
+            if (!src.startsWith('data:')) {
+                img.crossOrigin = 'anonymous';
+            }
             img.onload = () => resolve(img);
             img.onerror = () => resolve(null);
             img.src = src;
@@ -387,7 +389,7 @@ const App = () => {
                 autoPlay
                 playsInline
                 muted
-                className="hidden pointer-events-none"
+                style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', pointerEvents: 'none', zIndex: -100 }}
             />
 
             {/* Mobile Tab Navigation Bar */}

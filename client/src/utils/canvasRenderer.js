@@ -34,6 +34,7 @@ export const createReelRenderer = ({
     let outroStartTime = 0;
     let startTimestamp = 0;
     let endDelayStartTime = 0;
+    let lastFrameTime = 0;
 
     // Helper: Wrap text into lines
     const wrapText = (ctx, text, maxWidth) => {
@@ -88,6 +89,11 @@ export const createReelRenderer = ({
         renderFrame: (ctx, timestamp) => {
             if (startTimestamp === 0) startTimestamp = timestamp;
             const elapsed = timestamp - startTimestamp;
+
+            if (lastFrameTime === 0) lastFrameTime = timestamp;
+            const delta = timestamp - lastFrameTime;
+            lastFrameTime = timestamp;
+            const clampedDelta = Math.min(delta, 50);
 
             // Background Clear
             ctx.fillStyle = '#0a0a0a';
@@ -211,8 +217,9 @@ export const createReelRenderer = ({
             if (graphemes.length > 0) {
                 if (elapsed > 1500) {
                     const charsPerSec = (wpm * 5) / 60;
+                    const increment = (clampedDelta / 1000) * charsPerSec;
                     currentGraphemeProgress = Math.min(
-                        currentGraphemeProgress + charsPerSec / 60,
+                        currentGraphemeProgress + increment,
                         graphemes.length
                     );
                 }
@@ -275,16 +282,26 @@ export const createReelRenderer = ({
 
                         lineChars.forEach((ch) => {
                             const chWidth = ctx.measureText(ch).width;
-                            const isHighlighted = charAccumulator <= currentGraphemeProgress;
-
-                            ctx.fillStyle = isHighlighted ? '#f59e0b' : 'rgba(255, 255, 255, 0.88)';
-                            if (isHighlighted) {
+                            const charIndex = charAccumulator;
+                            
+                            let fill;
+                            if (currentGraphemeProgress >= charIndex + 1) {
+                                fill = '#f59e0b';
                                 ctx.shadowColor = '#d97706';
                                 ctx.shadowBlur = 10;
+                            } else if (currentGraphemeProgress > charIndex) {
+                                const ratio = currentGraphemeProgress - charIndex;
+                                fill = ctx.createLinearGradient(curX, 0, curX + chWidth, 0);
+                                fill.addColorStop(ratio, '#f59e0b');
+                                fill.addColorStop(ratio, 'rgba(255, 255, 255, 0.88)');
+                                ctx.shadowColor = '#d97706';
+                                ctx.shadowBlur = 10 * ratio;
                             } else {
+                                fill = 'rgba(255, 255, 255, 0.88)';
                                 ctx.shadowBlur = 0;
                             }
 
+                            ctx.fillStyle = fill;
                             ctx.fillText(ch, curX + chWidth / 2, lineY);
                             curX += chWidth;
                             charAccumulator++;
