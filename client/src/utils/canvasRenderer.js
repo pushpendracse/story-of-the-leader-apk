@@ -32,6 +32,8 @@ export const createReelRenderer = ({
     let isFinished = false;
     let showOutro = false;
     let outroStartTime = 0;
+    let startTimestamp = 0;
+    let endDelayStartTime = 0;
 
     // Helper: Wrap text into lines
     const wrapText = (ctx, text, maxWidth) => {
@@ -84,6 +86,9 @@ export const createReelRenderer = ({
         isComplete: () => isFinished,
 
         renderFrame: (ctx, timestamp) => {
+            if (startTimestamp === 0) startTimestamp = timestamp;
+            const elapsed = timestamp - startTimestamp;
+
             // Background Clear
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, width, height);
@@ -204,11 +209,13 @@ export const createReelRenderer = ({
 
             // 4. Script / Karaoke Teleprompter Section
             if (graphemes.length > 0) {
-                const charsPerSec = (wpm * 5) / 60;
-                currentGraphemeProgress = Math.min(
-                    currentGraphemeProgress + charsPerSec / 60,
-                    graphemes.length
-                );
+                if (elapsed > 1500) {
+                    const charsPerSec = (wpm * 5) / 60;
+                    currentGraphemeProgress = Math.min(
+                        currentGraphemeProgress + charsPerSec / 60,
+                        graphemes.length
+                    );
+                }
 
                 const cardX = 60;
                 const cardW = width - 120;
@@ -230,18 +237,6 @@ export const createReelRenderer = ({
                     cardH = calculatedH;
                     cardY = headerY + headerH + 30 + (availableArea - calculatedH) / 2;
                 }
-
-                // Draw Prompter Glass Container
-                drawRoundedRect(
-                    ctx,
-                    cardX,
-                    cardY,
-                    cardW,
-                    cardH,
-                    32,
-                    `rgba(10, 10, 15, ${prompterOpacity})`,
-                    'rgba(255, 255, 255, 0.12)'
-                );
 
                 // Clip within card for scrolling
                 ctx.save();
@@ -303,11 +298,16 @@ export const createReelRenderer = ({
 
                 // Check completion
                 if (currentGraphemeProgress >= graphemes.length) {
-                    if (outroImage && !showOutro) {
-                        showOutro = true;
-                        outroStartTime = timestamp;
-                    } else if (!outroImage) {
-                        isFinished = true;
+                    if (endDelayStartTime === 0) {
+                        endDelayStartTime = timestamp;
+                    }
+                    if (timestamp - endDelayStartTime > 4000) {
+                        if (outroImage && !showOutro) {
+                            showOutro = true;
+                            outroStartTime = timestamp;
+                        } else if (!outroImage) {
+                            isFinished = true;
+                        }
                     }
                 }
             }

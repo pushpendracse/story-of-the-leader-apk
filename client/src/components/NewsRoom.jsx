@@ -110,10 +110,12 @@ const NewsRoom = React.forwardRef(({
             setCurrentImgIdx(0);
             setPhase('heading');
             setShowOutro(false);
-            const timer = setTimeout(() => setPhase('content'), 1000);
-            return () => clearTimeout(timer);
+            if (isRecording) {
+                const timer = setTimeout(() => setPhase('content'), 1500);
+                return () => clearTimeout(timer);
+            }
         }
-    }, [content, heading]);
+    }, [content, heading, isRecording]);
 
     // Phase Trigger
     useEffect(() => {
@@ -138,7 +140,7 @@ const NewsRoom = React.forwardRef(({
                     } else {
                         onRecordingComplete?.();
                     }
-                }, 2000);
+                }, 4000);
             }
         }, 500);
         return () => clearInterval(interval);
@@ -221,9 +223,9 @@ const NewsRoom = React.forwardRef(({
                     ref={scrollRef}
                     style={{
                         maxHeight: cardMaxHeightStyle,
-                        backgroundColor: isLight ? `rgba(255, 255, 255, ${prompterOpacity})` : `rgba(12, 12, 18, ${prompterOpacity})`
+                        backgroundColor: 'transparent'
                     }}
-                    className={`w-full p-4 rounded-3xl border shadow-2xl overflow-y-auto no-scrollbar backdrop-blur-md transition-all duration-300 ${isLight ? 'border-black/10' : 'border-white/15'}`}
+                    className={`w-full p-4 overflow-y-auto no-scrollbar transition-all duration-300`}
                 >
                     <div
                         style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}

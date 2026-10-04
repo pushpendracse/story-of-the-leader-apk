@@ -59,9 +59,9 @@ const ControlPanel = ({
     ];
 
     return (
-        <div className="w-full h-full md:fixed md:top-0 md:right-0 md:w-96 bg-neutral-950 border-l border-neutral-800 text-white z-50 flex flex-col shadow-2xl relative">
+        <div className="w-full h-full md:fixed md:top-0 md:right-0 md:w-96 bg-slate-900/40 backdrop-blur-3xl border-l border-white/10 text-white z-50 flex flex-col shadow-[-10px_0_30px_rgba(0,0,0,0.3)] relative">
             {/* Header (Fixed at top) */}
-            <div className="flex items-center justify-between p-4 border-b border-neutral-800 bg-neutral-900/90 backdrop-blur-md shrink-0">
+            <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5 backdrop-blur-2xl shrink-0">
                 <h2 className="text-base font-black text-yellow-500 uppercase tracking-tighter italic flex items-center gap-2">
                     <span className="w-2.5 h-5 bg-yellow-500 rounded-full"></span>
                     Control Room
@@ -81,7 +81,7 @@ const ControlPanel = ({
             <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 space-y-4 pb-36">
 
                 {/* 1. Live Camera Switch Section */}
-                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-3 shadow-md">
+                <div className="bg-white/5 backdrop-blur-xl p-3.5 rounded-3xl border border-white/10 space-y-3 shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-white/20 transition-all">
                     <div className="flex items-center justify-between">
                         <label className="text-xs uppercase font-black tracking-wider text-neutral-200 flex items-center gap-1.5">
                             📷 Real Camera (Front / Anchor)
@@ -117,7 +117,7 @@ const ControlPanel = ({
                 </div>
 
                 {/* 2. Speed Control Room Section */}
-                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-3 shadow-md">
+                <div className="bg-white/5 backdrop-blur-xl p-3.5 rounded-3xl border border-white/10 space-y-3 shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-white/20 transition-all">
                     <div className="flex items-center justify-between">
                         <label className="text-xs uppercase font-black tracking-wider text-yellow-500 flex items-center gap-1">
                             ⏱️ Prompter Speed: <span className="text-white font-bold ml-1">{typingSpeed} WPM</span>
@@ -166,7 +166,7 @@ const ControlPanel = ({
                 </div>
 
                 {/* 3. Text Position & Screen Range Section */}
-                <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-3 shadow-md">
+                <div className="bg-white/5 backdrop-blur-xl p-3.5 rounded-3xl border border-white/10 space-y-3 shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-white/20 transition-all">
                     <label className="text-xs uppercase font-black tracking-wider text-neutral-200 block">
                         📐 Prompter Position on Screen
                     </label>
@@ -270,20 +270,20 @@ const ControlPanel = ({
                         value={h}
                         onChange={(e) => setH(e.target.value)}
                         placeholder="Episode / News Headline..."
-                        className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs outline-none focus:border-yellow-500 transition-all font-bold placeholder-neutral-600"
+                        className="w-full p-3 bg-black/40 border border-white/10 rounded-xl text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all font-bold placeholder-neutral-500 shadow-inner text-white"
                     />
                     <textarea
                         rows="5"
                         value={c}
                         onChange={(e) => setC(e.target.value)}
                         placeholder="Write your news script here (karaoke auto-scrolling)..."
-                        className="w-full p-3 bg-neutral-950 border border-neutral-800 rounded-xl text-xs outline-none focus:border-yellow-500 transition-all resize-none leading-relaxed placeholder-neutral-600 font-serif"
+                        className="w-full p-3 bg-black/40 border border-white/10 rounded-xl text-xs outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition-all resize-none leading-relaxed placeholder-neutral-500 font-serif shadow-inner text-white"
                     />
                 </div>
 
                 {/* 5. Background Images (shown when camera is OFF) */}
                 {!cameraEnabled && (
-                    <div className="bg-neutral-900 p-3.5 rounded-2xl border border-neutral-800 space-y-2.5 shadow-md">
+                    <div className="bg-white/5 backdrop-blur-xl p-3.5 rounded-3xl border border-white/10 space-y-2.5 shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-white/20 transition-all">
                         <label className="block text-neutral-300 text-xs uppercase font-bold tracking-wider">
                             🖼️ Background Gallery (Slide Images)
                         </label>
@@ -314,7 +314,7 @@ const ControlPanel = ({
                 )}
 
                 {/* 6. Mic Option */}
-                <div className="bg-neutral-900 p-3 rounded-2xl border border-neutral-800 flex items-center justify-between">
+                <div className="bg-white/5 backdrop-blur-xl p-3 rounded-3xl border border-white/10 flex items-center justify-between shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-white/20 transition-all">
                     <span className="text-xs font-bold text-neutral-300">🎙️ Microphone Audio</span>
                     <button
                         type="button"
@@ -328,7 +328,7 @@ const ControlPanel = ({
             </div>
 
             {/* FIXED / STICKY BOTTOM ACTION BAR (ALWAYS VISIBLE & NEVER COVERED) */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 bg-neutral-950/95 border-t border-neutral-800 backdrop-blur-xl z-50 flex flex-col gap-1.5 shadow-2xl">
+            <div className="mt-auto p-4 bg-slate-900/60 border-t border-white/10 backdrop-blur-3xl z-50 flex flex-col gap-2 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] shrink-0">
                 {recordingStatus && (
                     <div className="text-center">
                         <span className="text-[10px] text-red-400 font-black animate-pulse uppercase tracking-wider">
@@ -339,10 +339,11 @@ const ControlPanel = ({
                 <button
                     type="button"
                     onClick={onBroadcast}
-                    className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white py-3.5 rounded-2xl font-black shadow-xl shadow-red-600/30 text-xs uppercase tracking-widest flex items-center justify-center gap-2 border border-red-400"
+                    className="relative group overflow-hidden bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white py-4 rounded-2xl font-black shadow-[0_0_30px_rgba(225,29,72,0.6)] text-xs uppercase tracking-widest flex items-center justify-center gap-3 border border-white/20 transition-all"
                 >
-                    <span className="w-3 h-3 bg-white rounded-full animate-ping"></span>
-                    🎬 START RECORDING REEL
+                    <div className="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-700 ease-out -skew-x-12 -ml-12 w-24"></div>
+                    <span className="w-3.5 h-3.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] animate-pulse"></span>
+                    <span className="relative z-10">🎬 START RECORDING REEL</span>
                 </button>
             </div>
         </div>

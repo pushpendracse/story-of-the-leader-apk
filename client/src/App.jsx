@@ -342,20 +342,44 @@ const App = () => {
         }
     };
 
-    const handleDownloadVideo = () => {
+    const handleDownloadVideo = async () => {
         if (!exportedVideo) return;
-        const a = document.createElement('a');
-        a.href = exportedVideo.url;
-        a.download = exportedVideo.fileName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            if (a.parentNode) document.body.removeChild(a);
-        }, 1500);
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const { Filesystem, Directory } = await import('@capacitor/filesystem');
+                const reader = new FileReader();
+                reader.readAsDataURL(exportedVideo.blob);
+                reader.onloadend = async () => {
+                    try {
+                        const base64Data = reader.result.split(',')[1];
+                        await Filesystem.writeFile({
+                            path: `StoryOfTheLeader/${exportedVideo.fileName}`,
+                            data: base64Data,
+                            directory: Directory.Documents,
+                            recursive: true
+                        });
+                        alert('✅ Video successfully saved to Documents/StoryOfTheLeader folder!');
+                    } catch (e) {
+                        alert('⚠️ Could not save video: ' + e.message);
+                    }
+                };
+            } catch (e) {
+                alert('⚠️ Download error: ' + e.message);
+            }
+        } else {
+            const a = document.createElement('a');
+            a.href = exportedVideo.url;
+            a.download = exportedVideo.fileName;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                if (a.parentNode) document.body.removeChild(a);
+            }, 1500);
+        }
     };
 
     return (
-        <div className={`w-full h-[100dvh] bg-neutral-950 flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
+        <div className={`w-full h-[100dvh] bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-slate-950 to-black flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
 
             {/* Hidden Offscreen Video Element for Live Camera Synthesis onto Canvas */}
             <video
@@ -389,7 +413,7 @@ const App = () => {
 
                 {/* Top Quick Floating Controls Bar */}
                 {!isRecordingMode && (
-                    <div className="absolute top-3 z-30 flex items-center gap-2 bg-neutral-900/95 backdrop-blur-xl px-3 py-1.5 rounded-2xl border border-neutral-800 shadow-2xl max-w-[95%] overflow-x-auto no-scrollbar">
+                    <div className="absolute top-4 z-30 flex items-center gap-2 bg-white/10 backdrop-blur-2xl px-4 py-2 rounded-3xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.5)] max-w-[95%] overflow-x-auto no-scrollbar transition-all duration-300">
                         {/* Camera Quick Toggle */}
                         <button
                             onClick={() => setCameraEnabled(!cameraEnabled)}
@@ -460,14 +484,15 @@ const App = () => {
 
                 {/* DIRECT BIG RED RECORD BUTTON ON PREVIEW SCREEN (INSTANT 1-TAP RECORDING) */}
                 {!isRecordingMode && activeTab === 'preview' && (
-                    <div className="absolute bottom-5 z-40 flex items-center justify-center">
+                    <div className="absolute bottom-12 md:bottom-5 z-40 w-full flex items-center justify-center pointer-events-none">
                         <button
                             type="button"
                             onClick={startRecording}
-                            className="bg-red-600 hover:bg-red-500 active:scale-95 text-white px-7 py-3 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2.5 shadow-2xl shadow-red-600/50 border-2 border-red-400 animate-bounce"
+                            className="pointer-events-auto relative group overflow-hidden bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white px-8 py-3.5 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-[0_0_30px_rgba(225,29,72,0.6)] border border-white/20 animate-bounce"
                         >
-                            <span className="w-3.5 h-3.5 bg-white rounded-full"></span>
-                            🎬 START RECORDING REEL
+                            <div className="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-700 ease-out -skew-x-12 -ml-12 w-24"></div>
+                            <span className="w-3.5 h-3.5 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]"></span>
+                            <span className="relative z-10">🎬 START RECORDING REEL</span>
                         </button>
                     </div>
                 )}
@@ -539,8 +564,10 @@ const App = () => {
             {/* ======================================================== */}
             {exportedVideo && (
                 <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-sm w-full p-5 space-y-4 shadow-2xl flex flex-col items-center">
-                        <div className="w-full flex justify-between items-center pb-2 border-b border-neutral-800">
+                    <div className="bg-slate-900/80 backdrop-blur-3xl border border-white/20 rounded-[2rem] max-w-sm w-full p-6 space-y-5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col items-center relative overflow-hidden">
+                        <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/30 rounded-full blur-3xl pointer-events-none"></div>
+                        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-rose-500/30 rounded-full blur-3xl pointer-events-none"></div>
+                        <div className="relative z-10 w-full flex justify-between items-center pb-2 border-b border-white/10">
                             <div className="flex items-center gap-2">
                                 <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
                                 <span className="text-xs font-black text-white uppercase tracking-wider">
@@ -569,17 +596,17 @@ const App = () => {
                         </p>
 
                         {/* Actions */}
-                        <div className="w-full space-y-2">
+                        <div className="relative z-10 w-full space-y-3 mt-2">
                             <button
                                 onClick={handleShareVideo}
-                                className="w-full py-3.5 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-2xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20 active:scale-98 transition-all"
+                                className="w-full py-3.5 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-black font-black rounded-2xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(251,191,36,0.4)] active:scale-95 transition-all"
                             >
                                 📤 Share to WhatsApp / Instagram
                             </button>
 
                             <button
                                 onClick={handleDownloadVideo}
-                                className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-neutral-700 active:scale-98 transition-all"
+                                className="w-full py-3.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-white/20 active:scale-95 transition-all shadow-lg"
                             >
                                 💾 Download / Save to Phone
                             </button>
