@@ -247,8 +247,8 @@ const App = () => {
             }
 
             const recorderOptions = {
-                videoBitsPerSecond: 12000000, // 12 Mbps for Ultra HD
-                audioBitsPerSecond: 256000    // 256 kbps for HQ Audio
+                videoBitsPerSecond: 6000000, // 6 Mbps for High Quality HD (keeps file size safe for mobile)
+                audioBitsPerSecond: 128000
             };
             if (selectedCodec.mime) {
                 recorderOptions.mimeType = selectedCodec.mime;
