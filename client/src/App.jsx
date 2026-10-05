@@ -357,12 +357,24 @@ const App = () => {
                         const base64Data = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
                         if (!base64Data) throw new Error("Base64 encoding failed");
 
-                        await Filesystem.writeFile({
-                            path: exportedVideo.fileName,
-                            data: base64Data,
-                            directory: Directory.Documents
-                        });
-                        alert("✅ SUCCESS: Video has been downloaded to your phone's Documents folder!");
+                        const CHUNK_SIZE = 1024 * 1024 * 2; // 2MB
+                        for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
+                            const chunk = base64Data.slice(i, i + CHUNK_SIZE);
+                            if (i === 0) {
+                                await Filesystem.writeFile({
+                                    path: exportedVideo.fileName,
+                                    data: chunk,
+                                    directory: 'DOCUMENTS'
+                                });
+                            } else {
+                                await Filesystem.appendFile({
+                                    path: exportedVideo.fileName,
+                                    data: chunk,
+                                    directory: 'DOCUMENTS'
+                                });
+                            }
+                        }
+                        alert("✅ SUCCESS: Video has been securely saved to your phone's Documents folder!");
                     } catch (err) {
                         alert('⚠️ Save failed: ' + err.message);
                     }
