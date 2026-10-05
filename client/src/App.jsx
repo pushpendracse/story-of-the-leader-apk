@@ -349,38 +349,18 @@ const App = () => {
         if (!exportedVideo) return;
         if (Capacitor.isNativePlatform()) {
             try {
-                const reader = new FileReader();
-                reader.readAsDataURL(exportedVideo.blob);
-                reader.onloadend = async () => {
-                    try {
-                        const res = reader.result;
-                        const base64Data = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
-                        if (!base64Data) throw new Error("Base64 encoding failed");
-
-                        const CHUNK_SIZE = 1024 * 1024 * 2; // 2MB
-                        for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
-                            const chunk = base64Data.slice(i, i + CHUNK_SIZE);
-                            if (i === 0) {
-                                await Filesystem.writeFile({
-                                    path: exportedVideo.fileName,
-                                    data: chunk,
-                                    directory: 'DOCUMENTS'
-                                });
-                            } else {
-                                await Filesystem.appendFile({
-                                    path: exportedVideo.fileName,
-                                    data: chunk,
-                                    directory: 'DOCUMENTS'
-                                });
-                            }
-                        }
-                        alert("✅ SUCCESS: Video has been securely saved to your phone's Documents folder!");
-                    } catch (err) {
-                        alert('⚠️ Save failed: ' + err.message);
-                    }
-                };
+                if (exportedVideo.uri) {
+                    await Share.share({
+                        title: 'Save Reel',
+                        text: 'Click "Save to Gallery" or "Copy to..." to save this video.',
+                        url: exportedVideo.uri,
+                        dialogTitle: 'Choose where to save'
+                    });
+                } else {
+                    alert('⚠️ Video path not found. Please record again.');
+                }
             } catch (e) {
-                alert('⚠️ Download error: ' + e.message);
+                console.log('User cancelled save:', e);
             }
         } else {
             const a = document.createElement('a');
