@@ -1,5 +1,10 @@
 {
-  "appId": "com.story.leader",
-  "appName": "Story of the Leader",
-  "webDir": "dist"
+  "appId": "com.storyoftheleader.newsreel",
+  "appName": "StoryOfTheLeader",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true
+  }
 }

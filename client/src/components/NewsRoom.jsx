@@ -1,133 +1,278 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-const NewsRoom = ({ onStartStudio }) => {
-    const [heading, setHeading] = useState('');
-    const [script, setScript] = useState('');
-    const [images, setImages] = useState([]);
+const NewsRoom = React.forwardRef(({
+    newsData,
+    audioEnabled,
+    highlightSpeed = 110,
+    theme = 'dark',
+    isRecording,
+    onRecordingComplete,
+    cameraStream = null,
+    isFrontCamera = true,
+    prompterMode = 'center', // 'center' | 'bottom' | 'top'
+    prompterHeight = 0.55, // 0.30 to 0.85
+    prompterOpacity = 0.80, // 0.20 to 0.95
+    fontSize = 20
+}, ref) => {
+    const { heading, content, mediaList, outroImage } = newsData || { heading: '', content: '', mediaList: [], outroImage: null };
+    const [currentImgIdx, setCurrentImgIdx] = useState(0);
+    const [phase, setPhase] = useState('heading');
+    const [showOutro, setShowOutro] = useState(false);
 
-    const handleImageUpload = (e) => {
-        const files = Array.from(e.target.files);
-        if (images.length + files.length > 5) {
-            alert('You can only upload up to 5 images max.');
-            return;
+    const scrollRef = useRef(null);
+    const containerRef = useRef(null);
+    const cameraVideoRef = useRef(null);
+
+    // Bind camera stream to local preview video element
+    useEffect(() => {
+        if (cameraVideoRef.current && cameraStream) {
+            cameraVideoRef.current.srcObject = cameraStream;
+            cameraVideoRef.current.play().catch(e => console.log("Camera preview play notice:", e));
         }
+    }, [cameraStream]);
 
-        const newImages = files.map(file => {
-            const url = URL.createObjectURL(file);
-            return { file, url };
-        });
+    // Expose internal ref & video element to parent
+    React.useImperativeHandle(ref, () => ({
+        container: containerRef.current,
+        cameraVideo: cameraVideoRef.current
+    }));
 
-        setImages(prev => [...prev, ...newImages]);
+    // Image Rotation Logic (when camera is not active)
+    useEffect(() => {
+        if (!cameraStream && mediaList && mediaList.length > 1) {
+            const timer = setInterval(() => {
+                setCurrentImgIdx(prev => (prev + 1) % mediaList.length);
+            }, 8000);
+            return () => clearInterval(timer);
+        }
+    }, [mediaList, cameraStream]);
+
+    // Split content into graphemes
+    const graphemes = React.useMemo(() => {
+        if (!content) return [];
+        const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+            ? new Intl.Segmenter('hi-IN', { granularity: 'grapheme' })
+            : null;
+        return segmenter
+            ? Array.from(segmenter.segment(content)).map(segment => segment.segment)
+            : content.split('');
+    }, [content]);
+
+    const progressRef = useRef(0);
+    const lastFrameTime = useRef(0);
+    const requestRef = useRef();
+
+    // Highlighting Animation Loop
+    const animate = (time) => {
+        if (lastFrameTime.current !== 0) {
+            const deltaTime = time - lastFrameTime.current;
+            const clampedDelta = Math.min(deltaTime, 50);
+
+            const wpm = highlightSpeed || 110;
+            const charsPerSecond = (wpm * 5) / 60;
+            const increment = (clampedDelta / 1000) * charsPerSecond;
+
+            progressRef.current = Math.min(progressRef.current + increment, graphemes.length);
+            const currentProgress = progressRef.current;
+
+            if (containerRef.current) {
+                containerRef.current.style.setProperty('--progress', currentProgress);
+            }
+
+            // Smooth scrolling centered on active reading character
+            if (scrollRef.current && containerRef.current) {
+                const charElements = containerRef.current.querySelectorAll('.char-span');
+                const activeChar = charElements[Math.floor(currentProgress)];
+
+                if (activeChar) {
+                    const scrollContainer = scrollRef.current;
+                    const targetScroll = activeChar.offsetTop - (scrollContainer.clientHeight * 0.35);
+                    const currentScroll = scrollContainer.scrollTop;
+                    const scrollDiff = targetScroll - currentScroll;
+
+                    if (Math.abs(scrollDiff) > 0.5) {
+                        scrollContainer.scrollTop += scrollDiff * 0.12;
+                    }
+                }
+            }
+        }
+        lastFrameTime.current = time;
+        if (progressRef.current < graphemes.length) {
+            requestRef.current = requestAnimationFrame(animate);
+        }
     };
 
-    const removeImage = (indexToRemove) => {
-        setImages(prev => {
-            const newImages = [...prev];
-            URL.revokeObjectURL(newImages[indexToRemove].url);
-            newImages.splice(indexToRemove, 1);
-            return newImages;
-        });
-    };
+    // Reset Progress
+    useEffect(() => {
+        if (content) {
+            progressRef.current = 0;
+            if (containerRef.current) containerRef.current.style.setProperty('--progress', 0);
+            setCurrentImgIdx(0);
+            setPhase('heading');
+            setShowOutro(false);
+            if (isRecording) {
+                const timer = setTimeout(() => setPhase('content'), 1500);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [content, heading, isRecording]);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        onStartStudio({
-            heading: heading || 'BREAKING NEWS',
-            script: script || 'Welcome to the news room broadcast. This teleprompter automatically animates your script with high precision.',
-            images
-        });
-    };
+    // Phase Trigger
+    useEffect(() => {
+        if (phase === 'content' && progressRef.current < graphemes.length) {
+            requestRef.current = requestAnimationFrame(animate);
+        }
+        return () => {
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            lastFrameTime.current = 0;
+        };
+    }, [phase, highlightSpeed, graphemes.length]);
+
+    // Outro Logic
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (isRecording && progressRef.current >= graphemes.length && graphemes.length > 0 && !showOutro) {
+                clearInterval(interval);
+                setTimeout(() => {
+                    if (outroImage) {
+                        setShowOutro(true);
+                        setTimeout(() => onRecordingComplete?.(), 4000);
+                    } else {
+                        onRecordingComplete?.();
+                    }
+                }, 4000);
+            }
+        }, 500);
+        return () => clearInterval(interval);
+    }, [graphemes.length, isRecording, outroImage, showOutro, onRecordingComplete]);
+
+    const isLight = theme === 'light';
+    const containerBg = isLight ? 'bg-neutral-100' : 'bg-black';
+    const textColor = isLight ? 'text-black' : 'text-white';
+    const overlayGradient = isLight
+        ? 'from-white/70 via-transparent to-white/90'
+        : (cameraStream ? 'from-black/50 via-transparent to-black/75' : 'from-black/60 via-transparent to-black/85');
+    const headerFooterBg = isLight ? 'bg-white/75 border-black/10' : 'bg-black/75 border-white/10';
+
+    // Prompter Alignment based on mode
+    let prompterPositionClasses = 'justify-center items-center';
+    let cardMaxHeightStyle = `${Math.round(prompterHeight * 100)}%`;
+
+    if (prompterMode === 'bottom') {
+        prompterPositionClasses = 'justify-end items-center pb-24';
+        cardMaxHeightStyle = `${Math.min(48, Math.round(prompterHeight * 100))}%`;
+    } else if (prompterMode === 'top') {
+        prompterPositionClasses = 'justify-start items-center pt-2';
+        cardMaxHeightStyle = `${Math.min(52, Math.round(prompterHeight * 100))}%`;
+    }
 
     return (
-        <div className="w-full max-w-2xl mx-auto p-6 md:p-10 bg-slate-900/50 backdrop-blur-xl rounded-3xl border border-slate-800 shadow-2xl overflow-y-auto max-h-[100dvh]">
-            <div className="text-center mb-8">
-                <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 mb-2 tracking-tight">
-                    Story of the Leader
+        <div
+            ref={containerRef}
+            id="newsroom-container"
+            className={`relative flex flex-col overflow-hidden font-serif shadow-2xl transition-all duration-300 ${isRecording
+                ? 'w-auto h-full aspect-[9/16] border-0'
+                : 'w-full h-[100dvh] md:w-[380px] md:h-[680px] md:rounded-3xl md:border-[6px] border-neutral-900'
+                } ${containerBg}`}
+        >
+            {/* Outro Overlay */}
+            {showOutro && outroImage && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black animate-fade-in">
+                    <img src={outroImage} className="w-full h-full object-cover" alt="Outro" />
+                </div>
+            )}
+
+            {/* Layer 1: Live Front/Back Camera Stream */}
+            {cameraStream && (
+                <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+                    <video
+                        ref={cameraVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover ${isFrontCamera ? '-scale-x-100' : ''}`}
+                    />
+                </div>
+            )}
+
+            {/* Layer 2: Background Images (when camera is OFF) */}
+            {!cameraStream && mediaList && mediaList.length > 0 && (
+                <div className="absolute inset-0 z-0 overflow-hidden">
+                    <div
+                        key={currentImgIdx}
+                        className="w-full h-full bg-cover bg-center opacity-100 animate-ken-burns transition-all duration-1000"
+                        style={{ backgroundImage: `url(${mediaList[currentImgIdx]})` }}
+                    ></div>
+                </div>
+            )}
+
+            {/* Layer 3: Dark contrast gradient overlay */}
+            <div className={`absolute inset-0 z-10 bg-gradient-to-b ${overlayGradient} pointer-events-none`}></div>
+
+            {/* Header Section */}
+            <div className={`relative p-4 pb-3 backdrop-blur-md z-30 border-b mx-3 mt-3 rounded-2xl shadow-xl ${headerFooterBg} ${isLight ? 'border-gray-300' : 'border-white/10'}`}>
+                <h1 className={`text-base md:text-lg font-black text-center uppercase leading-tight line-clamp-2 drop-shadow-md tracking-tight ${textColor}`}>
+                    {heading}
                 </h1>
-                <p className="text-slate-400 font-medium tracking-wide text-sm">Professional Mobile Studio & Teleprompter</p>
+                <div className="h-[3px] w-14 bg-red-600 mt-2 mx-auto rounded-full shadow-red-500/50 shadow-md"></div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                
-                {/* Heading Input */}
-                <div className="space-y-2">
-                    <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">
-                        News Heading
-                    </label>
-                    <input
-                        type="text"
-                        value={heading}
-                        onChange={(e) => setHeading(e.target.value)}
-                        placeholder="Enter breaking news heading..."
-                        className="w-full bg-slate-950/50 border border-slate-800 text-white px-5 py-4 rounded-2xl focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-lg placeholder:text-slate-600"
-                        maxLength={60}
-                    />
-                </div>
-
-                {/* Script Input */}
-                <div className="space-y-2">
-                    <div className="flex justify-between items-end">
-                        <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">
-                            Teleprompter Script
-                        </label>
-                        <span className="text-xs font-mono text-slate-500">{script.length} chars</span>
-                    </div>
-                    <textarea
-                        value={script}
-                        onChange={(e) => setScript(e.target.value)}
-                        placeholder="Type or paste your full script here. It will automatically scroll on the screen..."
-                        rows={6}
-                        className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 px-5 py-4 rounded-2xl focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none leading-relaxed"
-                    />
-                </div>
-
-                {/* Media Upload */}
-                <div className="space-y-3">
-                    <label className="block text-sm font-bold text-slate-300 uppercase tracking-widest">
-                        Visuals & Media ({images.length}/5)
-                    </label>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {images.map((img, index) => (
-                            <div key={index} className="relative aspect-[4/3] rounded-xl overflow-hidden group border border-slate-700 bg-black">
-                                <img src={img.url} alt={`Upload ${index}`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                                <button
-                                    type="button"
-                                    onClick={() => removeImage(index)}
-                                    className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center backdrop-blur shadow-lg transition-transform active:scale-95"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        ))}
-                        
-                        {images.length < 5 && (
-                            <label className="aspect-[4/3] rounded-xl border-2 border-dashed border-slate-700 hover:border-indigo-500 hover:bg-indigo-500/5 transition-all flex flex-col items-center justify-center cursor-pointer text-slate-500 hover:text-indigo-400 gap-2">
-                                <span className="text-3xl">📸</span>
-                                <span className="text-xs font-bold uppercase tracking-wider">Add Photo</span>
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                />
-                            </label>
-                        )}
-                    </div>
-                </div>
-
-                <div className="pt-4">
-                    <button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-black text-lg py-5 px-6 rounded-2xl shadow-[0_0_40px_rgba(79,70,229,0.3)] active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-widest"
+            {/* Content / Prompter Area with Adjustable Mode and Height */}
+            <div className={`flex-grow px-3 overflow-hidden z-20 relative flex flex-col ${prompterPositionClasses}`}>
+                <div
+                    ref={scrollRef}
+                    style={{
+                        maxHeight: cardMaxHeightStyle,
+                        backgroundColor: 'transparent'
+                    }}
+                    className={`w-full p-4 overflow-y-auto no-scrollbar transition-all duration-300`}
+                >
+                    <div
+                        style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
+                        className={`text-center relative whitespace-pre-wrap drop-shadow-sm font-semibold ${textColor}`}
                     >
-                        <span>🎬 Start Studio</span>
-                    </button>
+                        {graphemes.map((char, i) => (
+                            <span
+                                key={i}
+                                className="char-span relative"
+                                style={{
+                                    backgroundImage: `linear-gradient(to right, #f59e0b calc((var(--progress, 0) - ${i}) * 100%), transparent 0%)`,
+                                    backgroundClip: 'padding-box',
+                                    WebkitBackgroundClip: 'padding-box',
+                                    display: 'inline',
+                                    whiteSpace: 'pre-wrap',
+                                    color: (isLight ? 'black' : 'white'),
+                                    transition: 'color 0.1s ease-out'
+                                }}
+                            >
+                                {char}
+                            </span>
+                        ))}
+                    </div>
                 </div>
-            </form>
+            </div>
+
+            {/* Footer Branding Bar */}
+            <div className={`relative bottom-0 w-full h-14 backdrop-blur-md border-t flex items-center justify-center z-30 ${headerFooterBg}`}>
+                <div className={`border px-3 py-1 rounded-full text-[9px] font-sans tracking-widest uppercase font-black ${isLight ? 'border-black/30 text-gray-700 bg-black/5' : 'border-white/30 text-gray-300 bg-white/5'}`}>
+                    Historical Archive • StoryOfTheLeader
+                </div>
+            </div>
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                @keyframes kenburns {
+                    0% { transform: scale(1) translate(0, 0); }
+                    50% { transform: scale(1.15) translate(-10px, -8px); }
+                    100% { transform: scale(1) translate(0, 0); }
+                }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+                .animate-ken-burns { animation: kenburns 14s ease-in-out infinite; }
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+            `}} />
         </div>
     );
-};
+});
 
 export default NewsRoom;
