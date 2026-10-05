@@ -396,21 +396,8 @@ const App = () => {
                 // Call the native file saver
                 const saveResult = await saveReelVideo(targetVideo.blob, targetVideo.ext);
                 
-                if (saveResult && saveResult.uri) {
-                    showSuccessNotification('Saved to your phone\'s Documents folder!');
-                    
-                    // On some Android versions, saving to Documents is hidden from gallery.
-                    // To ensure the user can definitely save it to their gallery if they want,
-                    // we can trigger the native share sheet immediately so they can press 'Save Video'.
-                    try {
-                        await Share.share({
-                            title: 'Video Saved',
-                            url: saveResult.uri,
-                            dialogTitle: 'Save to Gallery or Share'
-                        });
-                    } catch (shareErr) {
-                        console.log('Share sheet cancelled or failed', shareErr);
-                    }
+                if (saveResult && saveResult.uri === 'gallery') {
+                    showSuccessNotification('Saved directly to your phone Gallery (Movies)!');
                 } else {
                     // If native save failed completely, force web download
                     triggerWebDownload();
