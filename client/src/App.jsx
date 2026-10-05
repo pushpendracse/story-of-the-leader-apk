@@ -368,9 +368,24 @@ const App = () => {
         setIsProcessing(true);
         setRecordingStatus(`EXPORTING IN ${quality}...`);
 
+        const triggerWebDownload = () => {
+            try {
+                const a = document.createElement('a');
+                a.href = targetVideo.url;
+                a.download = `STORY_REEL_${quality}_${Date.now()}.${targetVideo.ext}`;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    if (a.parentNode) document.body.removeChild(a);
+                }, 10000);
+            } catch (err) {
+                console.error('Browser fallback error:', err);
+            }
+        };
+
         if (Capacitor.isNativePlatform()) {
             try {
-                // Call the native file saver ONLY when user manually clicks Export
+                // Call the native file saver
                 const saveResult = await saveReelVideo(targetVideo.blob, targetVideo.ext);
                 
                 if (saveResult && saveResult.uri) {
@@ -382,31 +397,22 @@ const App = () => {
                             dialogTitle: 'Choose where to save'
                         });
                     } catch (shareErr) {
-                        alert("Debug Native: Share sheet failed/cancelled. " + shareErr.message);
+                        // If Share fails (or user cancels), force a web download as backup!
+                        triggerWebDownload();
                     }
-                } else if (saveResult && !saveResult.success) {
-                    alert("Debug Native: saveReelVideo failed. " + saveResult.error);
                 } else {
-                    alert("Debug Native: Unknown failure in saveReelVideo.");
+                    // If native save failed completely, force web download
+                    triggerWebDownload();
                 }
             } catch (e) {
-                alert('Debug Native: Fatal error saving reel. ' + e.message);
+                // Fatal error, force web download
+                triggerWebDownload();
             }
         } else {
-            try {
-                const a = document.createElement('a');
-                a.href = targetVideo.url;
-                a.download = `STORY_REEL_${quality}_${Date.now()}.${targetVideo.ext}`;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    if (a.parentNode) document.body.removeChild(a);
-                }, 10000); // 10 seconds to ensure download starts
-                alert('Download triggered! Please check your browser downloads folder.');
-            } catch (err) {
-                alert('Debug Browser Error: ' + err.message);
-            }
+            triggerWebDownload();
+            alert('Download triggered! Please check your browser downloads folder.');
         }
+        
         setIsProcessing(false);
         setRecordingStatus('');
     };
