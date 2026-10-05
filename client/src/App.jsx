@@ -247,7 +247,7 @@ const App = () => {
             }
 
             const recorderOptions = {
-                videoBitsPerSecond: 6000000, // 6 Mbps for High Quality HD (keeps file size safe for mobile)
+                videoBitsPerSecond: 4500000, // Safe HD bitrate for all Android hardware encoders
                 audioBitsPerSecond: 128000
             };
             if (selectedCodec.mime) {
@@ -263,6 +263,13 @@ const App = () => {
                 if (chunksRef.current.length > 0) {
                     const mimeType = selectedCodec.mime || chunksRef.current[0].type || 'video/mp4';
                     const blob = new Blob(chunksRef.current, { type: mimeType });
+                    
+                    if (blob.size === 0) {
+                        alert("⚠️ Recording failed! The video stream was blocked by Android. Please check app permissions.");
+                        setIsProcessing(false);
+                        return;
+                    }
+
                     const blobUrl = URL.createObjectURL(blob);
 
                     const saveResult = await saveReelVideo(blob, selectedCodec.ext);
