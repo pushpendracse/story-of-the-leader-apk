@@ -286,7 +286,11 @@ const App = () => {
                     
                     setRecordingStatus('');
                     setIsProcessing(false);
-                    setShowExportModal(true); // Open quality modal immediately after recording stops
+                    
+                    // Auto-download right after stopping as requested by user
+                    setTimeout(() => {
+                        handleDownloadVideo();
+                    }, 800);
                 }
                 setIsRecording(false);
                 setIsRecordingMode(false);
@@ -365,9 +369,7 @@ const App = () => {
             return;
         }
         
-        setShowExportModal(false);
-        setIsProcessing(true);
-        setRecordingStatus(`EXPORTING IN ${quality}...`);
+        setRecordingStatus(`SAVING VIDEO...`);
 
         const triggerWebDownload = () => {
             try {
@@ -396,6 +398,19 @@ const App = () => {
                 
                 if (saveResult && saveResult.uri) {
                     showSuccessNotification('Saved to your phone\'s Documents folder!');
+                    
+                    // On some Android versions, saving to Documents is hidden from gallery.
+                    // To ensure the user can definitely save it to their gallery if they want,
+                    // we can trigger the native share sheet immediately so they can press 'Save Video'.
+                    try {
+                        await Share.share({
+                            title: 'Video Saved',
+                            url: saveResult.uri,
+                            dialogTitle: 'Save to Gallery or Share'
+                        });
+                    } catch (shareErr) {
+                        console.log('Share sheet cancelled or failed', shareErr);
+                    }
                 } else {
                     // If native save failed completely, force web download
                     triggerWebDownload();
@@ -409,7 +424,6 @@ const App = () => {
             showSuccessNotification('Saved! Check your browser downloads.');
         }
         
-        setIsProcessing(false);
         setRecordingStatus('');
     };
 
@@ -654,7 +668,7 @@ const App = () => {
                             </button>
 
                             <button
-                                onClick={() => setShowExportModal(true)}
+                                onClick={() => handleDownloadVideo()}
                                 className="w-full py-3.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-white/20 active:scale-95 transition-all shadow-lg"
                             >
                                 💾 Download / Save to Phone
@@ -662,51 +676,11 @@ const App = () => {
 
                             <button
                                 onClick={() => setExportedVideo(null)}
-                                className="w-full py-2 text-neutral-500 hover:text-neutral-300 font-bold text-xs uppercase tracking-wider transition-all"
+                                className="w-full py-2 text-neutral-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-all"
                             >
                                 ✕ Close & Record Another
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            
-            {/* Export Quality Modal */}
-            {showExportModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm shadow-2xl flex flex-col gap-4">
-                        <h3 className="text-xl font-black text-white mb-1">Export Video</h3>
-                        <p className="text-slate-400 text-sm mb-2">Choose the video quality you want to save.</p>
-                        
-                        <button 
-                            onClick={() => handleDownloadVideo('1080p')}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-4 px-5 rounded-2xl transition-all flex justify-between items-center shadow-lg shadow-indigo-600/20 active:scale-95"
-                        >
-                            <div className="flex flex-col items-start gap-1">
-                                <span>1080p (FHD)</span>
-                                <span className="text-[10px] text-indigo-200 uppercase tracking-widest font-normal">Original Size</span>
-                            </div>
-                            <span className="text-xs font-black bg-indigo-800 px-3 py-1.5 rounded-lg text-indigo-100">Recommended</span>
-                        </button>
-                        
-                        <button 
-                            onClick={() => handleDownloadVideo('720p')}
-                            className="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 px-5 rounded-2xl transition-all flex justify-between items-center border border-slate-700 active:scale-95"
-                        >
-                            <div className="flex flex-col items-start gap-1">
-                                <span>720p (HD)</span>
-                                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-normal">Data Saver</span>
-                            </div>
-                            <span className="text-xs font-black bg-slate-950 px-3 py-1.5 rounded-lg text-slate-300">Fast Export</span>
-                        </button>
-
-                        <button 
-                            onClick={() => setShowExportModal(false)}
-                            className="mt-2 text-neutral-400 hover:text-white py-3 text-sm font-bold uppercase tracking-wider transition-colors active:scale-95"
-                        >
-                            Cancel
-                        </button>
                     </div>
                 </div>
             )}
