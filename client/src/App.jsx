@@ -38,6 +38,7 @@ function App() {
                 streamRef.current = stream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
+                    videoRef.current.play().catch(e => console.error("Play error:", e));
                 }
                 
                 // Start drawing camera to canvas
@@ -62,7 +63,7 @@ function App() {
         if (!canvas || !video) return;
         
         const ctx = canvas.getContext('2d');
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video.readyState >= 2) { // HAVE_CURRENT_DATA or HAVE_ENOUGH_DATA
             // Draw full HD video feed to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
@@ -237,7 +238,7 @@ function App() {
                 autoPlay
                 playsInline
                 muted
-                style={{ position: 'absolute', opacity: 0, width: '1px', height: '1px', pointerEvents: 'none', zIndex: -100 }}
+                className="absolute w-[10px] h-[10px] opacity-0 pointer-events-none -z-50"
             />
 
             {/* The Main Viewport - Canvas (Output) */}
