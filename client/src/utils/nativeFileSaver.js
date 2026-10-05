@@ -25,12 +25,43 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             reader.readAsDataURL(blob);
             const base64Data = await base64Promise;
 
-            // 1. Save to Cache directory for reliable sharing
-            const writeResult = await Filesystem.writeFile({
-                path: fileName,
-                data: base64Data,
-                directory: 'CACHE' // Literal string required because Vite strips TS enums
-            });
+            if (!base64Data) {
+                alert("Debug: Base64 data is empty!");
+                return { success: false };
+            }
+
+            // Detect if video is too large for the JS Bridge (typically > 2MB causes issues on older devices)
+            const isLargeFile = base64Data.length > 2000000; 
+
+            let writeResult;
+            
+            if (isLargeFile) {
+                // Safely chunk the file
+                const CHUNK_SIZE = 1048576; // exactly 1MB (multiple of 4)
+                for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
+                    const chunk = base64Data.slice(i, i + CHUNK_SIZE);
+                    if (i === 0) {
+                        writeResult = await Filesystem.writeFile({
+                            path: fileName,
+                            data: chunk,
+                            directory: 'CACHE'
+                        });
+                    } else {
+                        await Filesystem.appendFile({
+                            path: fileName,
+                            data: chunk,
+                            directory: 'CACHE'
+                        });
+                    }
+                }
+            } else {
+                // 1. Save to Cache directory for reliable sharing
+                writeResult = await Filesystem.writeFile({
+                    path: fileName,
+                    data: base64Data,
+                    directory: 'CACHE' 
+                });
+            }
 
             // 2. Open Native Share sheet so user can save directly to Gallery, WhatsApp, or Drive
             const canShare = await Share.canShare().then(r => r.value).catch(() => false);
