@@ -38,35 +38,15 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                 return { success: false, error: "Empty Base64 data" };
             }
 
-            const isLargeFile = base64Data.length > 2000000; 
             let writeResult;
             
-            if (isLargeFile) {
-                // Chunk the file into precisely 1MB parts (multiple of 4 for Base64)
-                const CHUNK_SIZE = 1048576; 
-                for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
-                    const chunk = base64Data.slice(i, i + CHUNK_SIZE);
-                    if (i === 0) {
-                        writeResult = await Filesystem.writeFile({
-                            path: fileName,
-                            data: chunk,
-                            directory: Directory.Documents
-                        });
-                    } else {
-                        await Filesystem.appendFile({
-                            path: fileName,
-                            data: chunk,
-                            directory: Directory.Documents
-                        });
-                    }
-                }
-            } else {
-                writeResult = await Filesystem.writeFile({
-                    path: fileName,
-                    data: base64Data,
-                    directory: Directory.Documents 
-                });
-            }
+            // Write the entire base64 string at once. Modern Capacitor handles up to ~50MB safely.
+            // Chunking via appendFile with base64 can cause corruption because each chunk is decoded separately.
+            writeResult = await Filesystem.writeFile({
+                path: fileName,
+                data: base64Data,
+                directory: Directory.Documents 
+            });
 
             return { success: true, uri: writeResult.uri, fileName };
         } catch (error) {
