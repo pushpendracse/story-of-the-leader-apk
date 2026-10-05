@@ -374,17 +374,23 @@ const App = () => {
                 const saveResult = await saveReelVideo(targetVideo.blob, targetVideo.ext);
                 
                 if (saveResult && saveResult.uri) {
-                    await Share.share({
-                        title: `Save Reel (${quality})`,
-                        text: 'Click "Save to Gallery" or "Copy to..." to save this video.',
-                        url: saveResult.uri,
-                        dialogTitle: 'Choose where to save'
-                    });
+                    try {
+                        await Share.share({
+                            title: `Save Reel (${quality})`,
+                            text: 'Click "Save to Gallery" or "Copy to..." to save this video.',
+                            url: saveResult.uri,
+                            dialogTitle: 'Choose where to save'
+                        });
+                    } catch (shareErr) {
+                        alert("Debug Native: Share sheet failed/cancelled. " + shareErr.message);
+                    }
                 } else if (saveResult && !saveResult.success) {
-                    // The error was already alerted in nativeFileSaver.js
+                    alert("Debug Native: saveReelVideo failed. " + saveResult.error);
+                } else {
+                    alert("Debug Native: Unknown failure in saveReelVideo.");
                 }
             } catch (e) {
-                console.log('User cancelled save:', e);
+                alert('Debug Native: Fatal error saving reel. ' + e.message);
             }
         } else {
             try {
@@ -395,8 +401,8 @@ const App = () => {
                 a.click();
                 setTimeout(() => {
                     if (a.parentNode) document.body.removeChild(a);
-                }, 1500);
-                alert('Download triggered! Please check your browser downloads.');
+                }, 10000); // 10 seconds to ensure download starts
+                alert('Download triggered! Please check your browser downloads folder.');
             } catch (err) {
                 alert('Debug Browser Error: ' + err.message);
             }
