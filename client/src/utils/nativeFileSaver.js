@@ -29,7 +29,7 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             const writeResult = await Filesystem.writeFile({
                 path: fileName,
                 data: base64Data,
-                directory: Directory.Cache
+                directory: 'CACHE' // Literal string required because Vite strips TS enums
             });
 
             // 2. Open Native Share sheet so user can save directly to Gallery, WhatsApp, or Drive
