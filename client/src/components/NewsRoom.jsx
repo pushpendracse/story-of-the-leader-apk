@@ -12,7 +12,8 @@ const NewsRoom = React.forwardRef(({
     prompterMode = 'center', // 'center' | 'bottom' | 'top'
     prompterHeight = 0.55, // 0.30 to 0.85
     prompterOpacity = 0.80, // 0.20 to 0.95
-    fontSize = 20
+    fontSize = 20,
+    aspectRatio = '9:16'
 }, ref) => {
     const { heading, content, mediaList, outroImage } = newsData || { heading: '', content: '', mediaList: [], outroImage: null };
     const [currentImgIdx, setCurrentImgIdx] = useState(0);
@@ -171,8 +172,8 @@ const NewsRoom = React.forwardRef(({
             ref={containerRef}
             id="newsroom-container"
             className={`relative flex flex-col overflow-hidden font-serif shadow-2xl transition-all duration-300 ${isRecording
-                ? 'w-auto h-full aspect-[9/16] border-0'
-                : 'w-full h-[100dvh] md:w-[380px] md:h-[680px] md:rounded-3xl md:border-[6px] border-neutral-900'
+                ? `w-auto h-full ${aspectRatio === '16:9' ? 'aspect-[16/9]' : 'aspect-[9/16]'} border-0`
+                : `w-full ${aspectRatio === '16:9' ? 'aspect-[16/9] md:w-[680px] md:h-[380px]' : 'h-[100dvh] md:w-[380px] md:h-[680px]'} md:rounded-3xl md:border-[6px] border-neutral-900`
                 } ${containerBg}`}
         >
             {/* Outro Overlay */}

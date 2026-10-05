@@ -27,7 +27,9 @@ const ControlPanel = ({
     prompterOpacity,
     setPrompterOpacity,
     fontSize,
-    setFontSize
+    setFontSize,
+    aspectRatio,
+    setAspectRatio
 }) => {
     const { heading: h, content: c, mediaList: mediaPreviews, outroImage } = draftNews;
 
@@ -114,6 +116,29 @@ const ControlPanel = ({
                             Real device camera is active! You will see yourself on the preview screen.
                         </p>
                     )}
+                </div>
+
+                {/* Aspect Ratio Toggle Section */}
+                <div className="bg-white/5 backdrop-blur-xl p-3.5 rounded-3xl border border-white/10 space-y-2 shadow-[0_4px_24px_rgba(0,0,0,0.2)] hover:border-white/20 transition-all">
+                    <label className="text-[11px] uppercase font-black tracking-widest text-neutral-400">
+                        📺 Video Aspect Ratio
+                    </label>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setAspectRatio('9:16')}
+                            className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${aspectRatio === '9:16' ? 'bg-neutral-200 text-black border-neutral-200 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}
+                        >
+                            📱 9:16 (Shorts)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAspectRatio('16:9')}
+                            className={`flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${aspectRatio === '16:9' ? 'bg-neutral-200 text-black border-neutral-200 shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:bg-neutral-700'}`}
+                        >
+                            🖥️ 16:9 (YouTube)
+                        </button>
+                    </div>
                 </div>
 
                 {/* 2. Speed Control Room Section */}

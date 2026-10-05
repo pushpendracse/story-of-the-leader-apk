@@ -13,33 +13,36 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
 
     if (Capacitor.isNativePlatform()) {
         try {
-            const reader = new FileReader();
-            const base64Promise = new Promise((resolve, reject) => {
-                reader.onloadend = () => {
-                    const res = reader.result;
-                    const base64 = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
-                    resolve(base64);
-                };
-                reader.onerror = reject;
-            });
-            reader.readAsDataURL(blob);
-            const base64Data = await base64Promise;
+            const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunks (must be multiple of 3 bytes for flawless base64 concatenation)
+            let offset = 0;
 
-            if (!base64Data) {
-                alert("Debug: Empty Base64 data");
-                return { success: false, error: "Empty Base64 data" };
+            while (offset < blob.size) {
+                const chunk = blob.slice(offset, offset + CHUNK_SIZE);
+                const chunkBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const res = reader.result;
+                        resolve(typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(chunk);
+                });
+                
+                await Filesystem.appendFile({
+                    path: fileName,
+                    data: chunkBase64,
+                    directory: Directory.Cache
+                });
+                offset += CHUNK_SIZE;
             }
 
-            // Write to Cache first to avoid memory spikes and bridge limitations
-            const writeResult = await Filesystem.writeFile({
+            const stat = await Filesystem.getUri({
                 path: fileName,
-                data: base64Data,
-                directory: Directory.Cache,
-                recursive: true
+                directory: Directory.Cache
             });
 
             // Call our custom native Android plugin to copy from Cache to public Movies/Gallery
-            await MediaSaver.saveVideo({ sourcePath: writeResult.uri, fileName: fileName });
+            await MediaSaver.saveVideo({ sourcePath: stat.uri, fileName: fileName });
 
             return { success: true, uri: 'gallery', fileName };
         } catch (error) {

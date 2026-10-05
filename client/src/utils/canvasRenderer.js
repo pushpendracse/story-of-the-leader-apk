@@ -12,10 +12,11 @@ export const createReelRenderer = ({
     prompterMode = 'center', // 'center' | 'bottom' | 'top'
     prompterHeight = 0.55, // 0.30 to 0.85 of available height
     prompterOpacity = 0.80, // 0.20 to 0.95
-    fontSize = 44
+    fontSize = 44,
+    aspectRatio = '9:16'
 }) => {
-    const width = 1080;
-    const height = 1920;
+    const width = aspectRatio === '16:9' ? 1920 : 1080;
+    const height = aspectRatio === '16:9' ? 1080 : 1920;
 
     // Multi-lingual grapheme segmentation for precise Indic/Latin karaoke
     const segmenter = typeof Intl !== 'undefined' && Intl.Segmenter

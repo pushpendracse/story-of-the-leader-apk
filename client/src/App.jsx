@@ -33,6 +33,7 @@ const App = () => {
     const [prompterHeight, setPrompterHeight] = useState(0.50); // 0.35 | 0.50 | 0.70
     const [prompterOpacity, setPrompterOpacity] = useState(0.80);
     const [fontSize, setFontSize] = useState(22);
+    const [aspectRatio, setAspectRatio] = useState('9:16'); // '9:16' or '16:9'
 
     // Export & Share Modal State
     const [exportedVideo, setExportedVideo] = useState(null);
@@ -167,8 +168,8 @@ const App = () => {
             setRecordingStatus("PREPARING STUDIO...");
 
             const canvas = document.createElement('canvas');
-            canvas.width = 1080;
-            canvas.height = 1920;
+            canvas.width = aspectRatio === '16:9' ? 1920 : 1080;
+            canvas.height = aspectRatio === '16:9' ? 1080 : 1920;
             const ctx = canvas.getContext('2d', { alpha: false });
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
@@ -190,7 +191,8 @@ const App = () => {
                 prompterMode: prompterMode,
                 prompterHeight: prompterHeight,
                 prompterOpacity: prompterOpacity,
-                fontSize: fontSize * 2
+                fontSize: fontSize * 2,
+                aspectRatio: aspectRatio
             });
 
             let startTime = null;
@@ -530,6 +532,7 @@ const App = () => {
                     prompterHeight={prompterHeight}
                     prompterOpacity={prompterOpacity}
                     fontSize={fontSize}
+                    aspectRatio={aspectRatio}
                 />
 
                 {/* DIRECT BIG RED RECORD BUTTON ON PREVIEW SCREEN (INSTANT 1-TAP RECORDING) */}
@@ -601,6 +604,8 @@ const App = () => {
                     prompterMode={prompterMode}
                     setPrompterMode={setPrompterMode}
                     prompterHeight={prompterHeight}
+                    aspectRatio={aspectRatio}
+                    setAspectRatio={setAspectRatio}
                     setPrompterHeight={setPrompterHeight}
                     prompterOpacity={prompterOpacity}
                     setPrompterOpacity={setPrompterOpacity}
