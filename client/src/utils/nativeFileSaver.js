@@ -45,7 +45,8 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             writeResult = await Filesystem.writeFile({
                 path: fileName,
                 data: base64Data,
-                directory: Directory.Documents 
+                directory: Directory.Documents,
+                recursive: true
             });
 
             return { success: true, uri: writeResult.uri, fileName };
