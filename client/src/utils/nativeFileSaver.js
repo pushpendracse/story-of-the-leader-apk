@@ -11,10 +11,14 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
 
     if (Capacitor.isNativePlatform()) {
         try {
-            // Explicitly request storage permissions
-            const permStatus = await Filesystem.checkPermissions();
-            if (permStatus.publicStorage !== 'granted') {
-                await Filesystem.requestPermissions();
+            // Explicitly request storage permissions with a fallback
+            try {
+                const permStatus = await Filesystem.checkPermissions();
+                if (permStatus.publicStorage !== 'granted') {
+                    await Filesystem.requestPermissions();
+                }
+            } catch (permErr) {
+                console.warn("Permission check failed, proceeding anyway:", permErr);
             }
 
             const reader = new FileReader();
@@ -30,6 +34,7 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             const base64Data = await base64Promise;
 
             if (!base64Data) {
+                alert("Debug: Empty Base64 data");
                 return { success: false, error: "Empty Base64 data" };
             }
 
@@ -45,13 +50,13 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                         writeResult = await Filesystem.writeFile({
                             path: fileName,
                             data: chunk,
-                            directory: 'DOCUMENTS'
+                            directory: Directory.Documents
                         });
                     } else {
                         await Filesystem.appendFile({
                             path: fileName,
                             data: chunk,
-                            directory: 'DOCUMENTS'
+                            directory: Directory.Documents
                         });
                     }
                 }
@@ -59,16 +64,34 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                 writeResult = await Filesystem.writeFile({
                     path: fileName,
                     data: base64Data,
-                    directory: 'DOCUMENTS' 
+                    directory: Directory.Documents 
                 });
             }
 
             return { success: true, uri: writeResult.uri, fileName };
         } catch (error) {
             console.error("Capacitor native save error:", error);
+            alert("Studio Error: Failed to save video to device. " + (error.message || JSON.stringify(error)));
             return { success: false, error: error.message };
         }
     }
 
-    return { success: false, error: "Not a native platform" };
+    // Web fallback (Browser / Mobile Chrome direct download)
+    try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            if (a.parentNode) document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 2500);
+        return { success: true, downloaded: true, fileName };
+    } catch (e) {
+        console.error("Download fallback failed:", e);
+        return { success: false, error: e.message };
+    }
 };
