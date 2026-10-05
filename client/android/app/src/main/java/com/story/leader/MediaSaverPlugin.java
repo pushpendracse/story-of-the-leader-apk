@@ -16,16 +16,27 @@ import android.os.Build;
 public class MediaSaverPlugin extends Plugin {
     @PluginMethod
     public void saveVideo(PluginCall call) {
-        String base64Data = call.getString("base64Data");
+        String sourcePath = call.getString("sourcePath");
         String fileName = call.getString("fileName");
         
-        if (base64Data == null || fileName == null) {
-            call.reject("Missing base64Data or fileName");
+        if (sourcePath == null || fileName == null) {
+            call.reject("Missing sourcePath or fileName");
             return;
         }
         
         try {
-            byte[] videoBytes = Base64.decode(base64Data, Base64.DEFAULT);
+            // sourcePath is expected to be a local file path (e.g. from Filesystem plugin)
+            // Strip "file://" prefix if present
+            if (sourcePath.startsWith("file://")) {
+                sourcePath = sourcePath.substring(7);
+            }
+            
+            java.io.File sourceFile = new java.io.File(sourcePath);
+            if (!sourceFile.exists()) {
+                call.reject("Source file does not exist at path: " + sourcePath);
+                return;
+            }
+
             ContentValues values = new ContentValues();
             values.put(MediaStore.Video.Media.DISPLAY_NAME, fileName);
             values.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
@@ -42,8 +53,15 @@ public class MediaSaverPlugin extends Plugin {
             Uri uri = getContext().getContentResolver().insert(collection, values);
             if (uri != null) {
                 OutputStream os = getContext().getContentResolver().openOutputStream(uri);
+                java.io.FileInputStream fis = new java.io.FileInputStream(sourceFile);
+                
                 if (os != null) {
-                    os.write(videoBytes);
+                    byte[] buffer = new byte[8192];
+                    int length;
+                    while ((length = fis.read(buffer)) > 0) {
+                        os.write(buffer, 0, length);
+                    }
+                    fis.close();
                     os.close();
                     
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -52,8 +70,12 @@ public class MediaSaverPlugin extends Plugin {
                         getContext().getContentResolver().update(uri, values, null, null);
                     }
                     
+                    // Optionally delete the source cache file
+                    sourceFile.delete();
+                    
                     call.resolve();
                 } else {
+                    fis.close();
                     call.reject("Could not open output stream");
                 }
             } else {

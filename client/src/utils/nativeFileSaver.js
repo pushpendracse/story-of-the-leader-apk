@@ -30,8 +30,16 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                 return { success: false, error: "Empty Base64 data" };
             }
 
-            // Call our custom native Android plugin to save directly to public Movies/Gallery
-            await MediaSaver.saveVideo({ base64Data: base64Data, fileName: fileName });
+            // Write to Cache first to avoid memory spikes and bridge limitations
+            const writeResult = await Filesystem.writeFile({
+                path: fileName,
+                data: base64Data,
+                directory: Directory.Cache,
+                recursive: true
+            });
+
+            // Call our custom native Android plugin to copy from Cache to public Movies/Gallery
+            await MediaSaver.saveVideo({ sourcePath: writeResult.uri, fileName: fileName });
 
             return { success: true, uri: 'gallery', fileName };
         } catch (error) {
