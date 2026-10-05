@@ -11,6 +11,12 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
 
     if (Capacitor.isNativePlatform()) {
         try {
+            // Explicitly request storage permissions
+            const permStatus = await Filesystem.checkPermissions();
+            if (permStatus.publicStorage !== 'granted') {
+                await Filesystem.requestPermissions();
+            }
+
             const reader = new FileReader();
             const base64Promise = new Promise((resolve, reject) => {
                 reader.onloadend = () => {
