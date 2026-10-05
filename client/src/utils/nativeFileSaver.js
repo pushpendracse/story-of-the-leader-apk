@@ -1,10 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Share } from '@capacitor/share';
 
 export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
     const timestamp = Date.now();
-    // Universal extension: MP4 is supported natively on Android, iOS/iPhone, WhatsApp, Instagram, and PC
     let ext = preferredExt;
     if (!ext) {
         ext = blob.type?.includes('webm') && !blob.type?.includes('h264') ? 'webm' : 'mp4';
@@ -26,18 +24,15 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
             const base64Data = await base64Promise;
 
             if (!base64Data) {
-                alert("Debug: Base64 data is empty!");
-                return { success: false };
+                return { success: false, error: "Empty Base64 data" };
             }
 
-            // Detect if video is too large for the JS Bridge (typically > 2MB causes issues on older devices)
             const isLargeFile = base64Data.length > 2000000; 
-
             let writeResult;
             
             if (isLargeFile) {
-                // Safely chunk the file
-                const CHUNK_SIZE = 1048576; // exactly 1MB (multiple of 4)
+                // Chunk the file into precisely 1MB parts (multiple of 4 for Base64)
+                const CHUNK_SIZE = 1048576; 
                 for (let i = 0; i < base64Data.length; i += CHUNK_SIZE) {
                     const chunk = base64Data.slice(i, i + CHUNK_SIZE);
                     if (i === 0) {
@@ -55,7 +50,6 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                     }
                 }
             } else {
-                // 1. Save to Documents directory for direct user access
                 writeResult = await Filesystem.writeFile({
                     path: fileName,
                     data: base64Data,
@@ -63,31 +57,12 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                 });
             }
 
-            // Removed redundant Share.share from here. It is handled by App.jsx!
-            
             return { success: true, uri: writeResult.uri, fileName };
         } catch (error) {
             console.error("Capacitor native save error:", error);
-            alert("Studio Error: Failed to save video to device. " + (error.message || JSON.stringify(error)));
+            return { success: false, error: error.message };
         }
     }
 
-    // Web fallback (Browser / Mobile Chrome direct download)
-    try {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            if (a.parentNode) document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }, 2500);
-        return { success: true, downloaded: true, fileName };
-    } catch (e) {
-        console.error("Download fallback failed:", e);
-        return { success: false, error: e.message };
-    }
+    return { success: false, error: "Not a native platform" };
 };

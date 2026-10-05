@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">StoryOfTheLeader</string>
-    <string name="title_activity_main">StoryOfTheLeader</string>
-    <string name="package_name">com.storyoftheleader.newsreel</string>
-    <string name="custom_url_scheme">com.storyoftheleader.newsreel</string>
+    <string name="app_name">Story of the Leader</string>
+    <string name="title_activity_main">Story of the Leader</string>
+    <string name="package_name">com.story.leader</string>
+    <string name="custom_url_scheme">com.story.leader</string>
 </resources>

@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.storyoftheleader.newsreel"
+    namespace = "com.story.leader"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.storyoftheleader.newsreel"
+        applicationId "com.story.leader"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
