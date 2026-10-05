@@ -36,6 +36,7 @@ const App = () => {
 
     // Export & Share Modal State
     const [exportedVideo, setExportedVideo] = useState(null);
+    const exportedVideoRef = useRef(null); // Bulletproof ref to prevent closure/batching nulls
     const [showExportModal, setShowExportModal] = useState(false);
 
     const [showControls, setShowControls] = useState(true);
@@ -273,16 +274,18 @@ const App = () => {
 
                     const blobUrl = URL.createObjectURL(blob);
 
-                    // Stop auto-saving! Just keep the blob ready for manual export.
-                    setExportedVideo({
+                    const videoData = {
                         url: blobUrl,
                         blob: blob,
                         ext: selectedCodec.ext,
                         sizeMb: (blob.size / (1024 * 1024)).toFixed(1)
-                    });
+                    };
+                    setExportedVideo(videoData);
+                    exportedVideoRef.current = videoData;
                     
                     setRecordingStatus('');
                     setIsProcessing(false);
+                    setShowExportModal(true); // Open quality modal immediately after recording stops
                 }
                 setIsRecording(false);
                 setIsRecordingMode(false);
@@ -355,44 +358,51 @@ const App = () => {
     };
 
     const handleDownloadVideo = async (quality = '1080p') => {
-        if (!exportedVideo) return;
+        const targetVideo = exportedVideoRef.current || exportedVideo;
+        if (!targetVideo) {
+            alert('Debug: Still missing video data! Recording might have failed silently.');
+            return;
+        }
         
         setShowExportModal(false);
         setIsProcessing(true);
         setRecordingStatus(`EXPORTING IN ${quality}...`);
 
-        setTimeout(async () => {
-            if (Capacitor.isNativePlatform()) {
-                try {
-                    // Call the native file saver ONLY when user manually clicks Export
-                    const saveResult = await saveReelVideo(exportedVideo.blob, exportedVideo.ext);
-                    
-                    if (saveResult && saveResult.uri) {
-                        await Share.share({
-                            title: `Save Reel (${quality})`,
-                            text: 'Click "Save to Gallery" or "Copy to..." to save this video.',
-                            url: saveResult.uri,
-                            dialogTitle: 'Choose where to save'
-                        });
-                    } else if (saveResult && !saveResult.success) {
-                        // The error was already alerted in nativeFileSaver.js
-                    }
-                } catch (e) {
-                    console.log('User cancelled save:', e);
+        if (Capacitor.isNativePlatform()) {
+            try {
+                // Call the native file saver ONLY when user manually clicks Export
+                const saveResult = await saveReelVideo(targetVideo.blob, targetVideo.ext);
+                
+                if (saveResult && saveResult.uri) {
+                    await Share.share({
+                        title: `Save Reel (${quality})`,
+                        text: 'Click "Save to Gallery" or "Copy to..." to save this video.',
+                        url: saveResult.uri,
+                        dialogTitle: 'Choose where to save'
+                    });
+                } else if (saveResult && !saveResult.success) {
+                    // The error was already alerted in nativeFileSaver.js
                 }
-            } else {
+            } catch (e) {
+                console.log('User cancelled save:', e);
+            }
+        } else {
+            try {
                 const a = document.createElement('a');
-                a.href = exportedVideo.url;
-                a.download = `STORY_REEL_${quality}_${Date.now()}.${exportedVideo.ext}`;
+                a.href = targetVideo.url;
+                a.download = `STORY_REEL_${quality}_${Date.now()}.${targetVideo.ext}`;
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => {
                     if (a.parentNode) document.body.removeChild(a);
                 }, 1500);
+                alert('Download triggered! Please check your browser downloads.');
+            } catch (err) {
+                alert('Debug Browser Error: ' + err.message);
             }
-            setIsProcessing(false);
-            setRecordingStatus('');
-        }, 500); // Small delay to let UI show the Exporting text
+        }
+        setIsProcessing(false);
+        setRecordingStatus('');
     };
 
     return (
@@ -625,7 +635,7 @@ const App = () => {
                                 onClick={() => setShowExportModal(true)}
                                 className="w-full py-3.5 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-white/20 active:scale-95 transition-all shadow-lg"
                             >
-                                💾 Export Video
+                                💾 Download / Save to Phone
                             </button>
 
                             <button
