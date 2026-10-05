@@ -638,7 +638,7 @@ const App = () => {
                     </div>
                 </div>
             )}
-        </div>
+
             
             {/* Export Quality Modal */}
             {showExportModal && (
