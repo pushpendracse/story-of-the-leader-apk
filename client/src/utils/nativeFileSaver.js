@@ -44,22 +44,22 @@ export const saveReelVideo = async (blob, preferredExt = 'mp4') => {
                         writeResult = await Filesystem.writeFile({
                             path: fileName,
                             data: chunk,
-                            directory: 'CACHE'
+                            directory: 'DOCUMENTS'
                         });
                     } else {
                         await Filesystem.appendFile({
                             path: fileName,
                             data: chunk,
-                            directory: 'CACHE'
+                            directory: 'DOCUMENTS'
                         });
                     }
                 }
             } else {
-                // 1. Save to Cache directory for reliable sharing
+                // 1. Save to Documents directory for direct user access
                 writeResult = await Filesystem.writeFile({
                     path: fileName,
                     data: base64Data,
-                    directory: 'CACHE' 
+                    directory: 'DOCUMENTS' 
                 });
             }
 

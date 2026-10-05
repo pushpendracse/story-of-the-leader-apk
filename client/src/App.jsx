@@ -38,6 +38,7 @@ const App = () => {
     const [exportedVideo, setExportedVideo] = useState(null);
     const exportedVideoRef = useRef(null); // Bulletproof ref to prevent closure/batching nulls
     const [showExportModal, setShowExportModal] = useState(false);
+    const [toastMessage, setToastMessage] = useState(null);
 
     const [showControls, setShowControls] = useState(true);
     const [controlsTimeout, setControlsTimeout] = useState(null);
@@ -383,23 +384,18 @@ const App = () => {
             }
         };
 
+        const showSuccessNotification = (msg) => {
+            setToastMessage(msg);
+            setTimeout(() => setToastMessage(null), 6000); // Hide after 6 seconds
+        };
+
         if (Capacitor.isNativePlatform()) {
             try {
                 // Call the native file saver
                 const saveResult = await saveReelVideo(targetVideo.blob, targetVideo.ext);
                 
                 if (saveResult && saveResult.uri) {
-                    try {
-                        await Share.share({
-                            title: `Save Reel (${quality})`,
-                            text: 'Click "Save to Gallery" or "Copy to..." to save this video.',
-                            url: saveResult.uri,
-                            dialogTitle: 'Choose where to save'
-                        });
-                    } catch (shareErr) {
-                        // If Share fails (or user cancels), force a web download as backup!
-                        triggerWebDownload();
-                    }
+                    showSuccessNotification('Saved to your phone\'s Documents folder!');
                 } else {
                     // If native save failed completely, force web download
                     triggerWebDownload();
@@ -410,7 +406,7 @@ const App = () => {
             }
         } else {
             triggerWebDownload();
-            alert('Download triggered! Please check your browser downloads folder.');
+            showSuccessNotification('Saved! Check your browser downloads.');
         }
         
         setIsProcessing(false);
@@ -419,6 +415,20 @@ const App = () => {
 
     return (
         <div className={`w-full h-[100dvh] bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-slate-950 to-black flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
+            
+            {/* Custom In-App Notification (Toast) */}
+            {toastMessage && (
+                <div className="absolute top-10 left-1/2 -translate-x-1/2 z-[9999] bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.4)] flex items-center gap-4 transition-all duration-500 animate-in slide-in-from-top-10 fade-in zoom-in-95">
+                    <div className="bg-white/20 p-2 rounded-full">
+                        <span className="text-xl leading-none">📥</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <p className="font-black text-sm tracking-wide uppercase">Download Complete</p>
+                        <p className="text-xs font-medium text-emerald-50">{toastMessage}</p>
+                    </div>
+                    <button onClick={() => setToastMessage(null)} className="ml-2 text-white/70 hover:text-white">✕</button>
+                </div>
+            )}
 
             {/* Hidden Offscreen Video Element for Live Camera Synthesis onto Canvas */}
             <video
