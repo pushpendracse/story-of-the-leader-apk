@@ -13,7 +13,9 @@ export const createReelRenderer = ({
     prompterHeight = 0.55, // 0.30 to 0.85 of available height
     prompterOpacity = 0.80, // 0.20 to 0.95
     fontSize = 44,
-    aspectRatio = '9:16'
+    aspectRatio = '9:16',
+    textAlign = 'justify',
+    highlightStyle = 'karaoke'
 }) => {
     const width = aspectRatio === '16:9' ? 1920 : 1080;
     const height = aspectRatio === '16:9' ? 1080 : 1920;
@@ -37,23 +39,29 @@ export const createReelRenderer = ({
     let endDelayStartTime = 0;
     let lastFrameTime = 0;
 
-    // Helper: Wrap text into lines
+    // Helper: Wrap text into lines, preserving newlines
     const wrapText = (ctx, text, maxWidth) => {
-        const words = text.split(' ');
         const lines = [];
-        let currentLine = '';
-
-        for (let i = 0; i < words.length; i++) {
-            const testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && currentLine) {
-                lines.push(currentLine);
-                currentLine = words[i];
-            } else {
-                currentLine = testLine;
+        const paragraphs = text.split('\n');
+        for (const p of paragraphs) {
+            if (!p) {
+                lines.push({ text: '', isLastInPara: true });
+                continue;
             }
+            const words = p.split(' ');
+            let currentLine = '';
+            for (let i = 0; i < words.length; i++) {
+                const testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && currentLine) {
+                    lines.push({ text: currentLine, isLastInPara: false });
+                    currentLine = words[i];
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            if (currentLine) lines.push({ text: currentLine, isLastInPara: true });
         }
-        if (currentLine) lines.push(currentLine);
         return lines;
     };
 
@@ -254,7 +262,7 @@ export const createReelRenderer = ({
 
                 const activeFontSize = fontSize || 44;
                 ctx.font = `600 ${activeFontSize}px serif`;
-                ctx.textAlign = 'center';
+                ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
 
                 const lines = wrapText(ctx, content, cardW - 100);
@@ -271,44 +279,102 @@ export const createReelRenderer = ({
 
                 let charAccumulator = 0;
 
-                lines.forEach((line, lineIdx) => {
+                lines.forEach((lineObj, lineIdx) => {
+                    const lineText = lineObj.text;
                     const lineY = activeScrollY + lineIdx * lineHeight;
                     if (lineY > cardY - 90 && lineY < cardY + cardH + 90) {
+                        
+                        // Edge Fade and Blur Effect
+                        let lineAlpha = 1;
+                        const distToTop = lineY - (cardY + 20);
+                        const distToBottom = (cardY + cardH - 20) - (lineY + lineHeight);
+                        
+                        if (distToTop < 60) lineAlpha = Math.max(0, distToTop / 60);
+                        if (distToBottom < 60) lineAlpha = Math.min(lineAlpha, Math.max(0, distToBottom / 60));
+                        
+                        ctx.globalAlpha = lineAlpha;
+                        if (lineAlpha < 1) {
+                            ctx.filter = `blur(${(1 - lineAlpha) * 3}px)`;
+                        } else {
+                            ctx.filter = 'none';
+                        }
+
                         const lineChars = Array.from(
-                            segmenter ? segmenter.segment(line) : line.split('')
+                            segmenter ? segmenter.segment(lineText) : lineText.split('')
                         ).map(s => typeof s === 'string' ? s : s.segment);
 
-                        const lineWidth = ctx.measureText(line).width;
-                        let curX = (width - lineWidth) / 2;
+                        const lineWidth = ctx.measureText(lineText).width;
+                        let curX = cardX + 50; // default for left
+
+                        if (textAlign === 'center') {
+                            curX = (width - lineWidth) / 2;
+                        }
+
+                        let spaceExtra = 0;
+                        if (textAlign === 'justify' && !lineObj.isLastInPara && lineChars.length > 0) {
+                            const spaceCount = lineChars.filter(c => c === ' ').length;
+                            if (spaceCount > 0) {
+                                spaceExtra = ((cardW - 100) - lineWidth) / spaceCount;
+                            }
+                        }
 
                         lineChars.forEach((ch) => {
                             const chWidth = ctx.measureText(ch).width;
                             const charIndex = charAccumulator;
                             
-                            let fill;
-                            if (currentGraphemeProgress >= charIndex + 1) {
-                                fill = '#f59e0b';
-                                ctx.shadowColor = '#d97706';
-                                ctx.shadowBlur = 10;
-                            } else if (currentGraphemeProgress > charIndex) {
-                                const ratio = currentGraphemeProgress - charIndex;
-                                fill = ctx.createLinearGradient(curX, 0, curX + chWidth, 0);
-                                fill.addColorStop(ratio, '#f59e0b');
-                                fill.addColorStop(ratio, 'rgba(255, 255, 255, 0.88)');
-                                ctx.shadowColor = '#d97706';
-                                ctx.shadowBlur = 10 * ratio;
+                            const isPassed = currentGraphemeProgress >= charIndex + 1;
+                            const isPassing = currentGraphemeProgress > charIndex && currentGraphemeProgress < charIndex + 1;
+                            const ratio = isPassing ? currentGraphemeProgress - charIndex : (isPassed ? 1 : 0);
+
+                            const textColorLight = 'rgba(255, 255, 255, 0.88)';
+                            const textColorDark = 'rgba(255, 255, 255, 0.40)';
+                            const highlightColor = '#f59e0b';
+                            
+                            let charColor = textColorLight;
+                            if (highlightStyle === 'karaoke' || highlightStyle === 'color') {
+                                charColor = textColorDark;
+                            }
+                            
+                            if (isPassed || isPassing) {
+                                if (highlightStyle === 'box') {
+                                    ctx.fillStyle = isPassed ? 'rgba(245, 158, 11, 0.6)' : `rgba(245, 158, 11, ${0.6 * ratio})`;
+                                    ctx.fillRect(curX - 1, lineY - 2, chWidth + 2, activeFontSize + 12);
+                                } else if (highlightStyle === 'underline') {
+                                    ctx.fillStyle = highlightColor;
+                                    const uw = isPassed ? chWidth : chWidth * ratio;
+                                    ctx.fillRect(curX, lineY + activeFontSize + 6, uw, 4);
+                                }
+                            }
+
+                            if (highlightStyle === 'karaoke' || highlightStyle === 'color') {
+                                if (isPassed) {
+                                    ctx.fillStyle = highlightColor;
+                                    ctx.shadowColor = '#d97706';
+                                    ctx.shadowBlur = 10;
+                                } else if (isPassing) {
+                                    const fill = ctx.createLinearGradient(curX, 0, curX + chWidth, 0);
+                                    fill.addColorStop(ratio, highlightColor);
+                                    fill.addColorStop(ratio, charColor);
+                                    ctx.fillStyle = fill;
+                                    ctx.shadowColor = '#d97706';
+                                    ctx.shadowBlur = 10 * ratio;
+                                } else {
+                                    ctx.fillStyle = charColor;
+                                    ctx.shadowBlur = 0;
+                                }
                             } else {
-                                fill = 'rgba(255, 255, 255, 0.88)';
+                                ctx.fillStyle = textColorLight;
                                 ctx.shadowBlur = 0;
                             }
 
-                            ctx.fillStyle = fill;
-                            ctx.fillText(ch, curX + chWidth / 2, lineY);
-                            curX += chWidth;
+                            ctx.fillText(ch, curX, lineY);
+                            curX += chWidth + (ch === ' ' ? spaceExtra : 0);
                             charAccumulator++;
                         });
+                        
+                        charAccumulator++; // Add 1 for the space or newline that caused the wrap
                     } else {
-                        charAccumulator += line.length;
+                        charAccumulator += lineText.length + 1; // +1 for the separator
                     }
                 });
 

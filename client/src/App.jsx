@@ -34,6 +34,8 @@ const App = () => {
     const [prompterOpacity, setPrompterOpacity] = useState(0.80);
     const [fontSize, setFontSize] = useState(22);
     const [aspectRatio, setAspectRatio] = useState('9:16'); // '9:16' or '16:9'
+    const [textAlign, setTextAlign] = useState('justify'); // 'left' | 'center' | 'justify'
+    const [highlightStyle, setHighlightStyle] = useState('karaoke'); // 'karaoke' | 'box' | 'underline' | 'color'
 
     // Export & Share Modal State
     const [exportedVideo, setExportedVideo] = useState(null);
@@ -192,7 +194,9 @@ const App = () => {
                 prompterHeight: prompterHeight,
                 prompterOpacity: prompterOpacity,
                 fontSize: fontSize * 2,
-                aspectRatio: aspectRatio
+                aspectRatio: aspectRatio,
+                textAlign: textAlign,
+                highlightStyle: highlightStyle
             });
 
             let startTime = null;
@@ -533,6 +537,8 @@ const App = () => {
                     prompterOpacity={prompterOpacity}
                     fontSize={fontSize}
                     aspectRatio={aspectRatio}
+                    textAlign={textAlign}
+                    highlightStyle={highlightStyle}
                 />
 
                 {/* DIRECT BIG RED RECORD BUTTON ON PREVIEW SCREEN (INSTANT 1-TAP RECORDING) */}
@@ -611,6 +617,10 @@ const App = () => {
                     setPrompterOpacity={setPrompterOpacity}
                     fontSize={fontSize}
                     setFontSize={setFontSize}
+                    textAlign={textAlign}
+                    setTextAlign={setTextAlign}
+                    highlightStyle={highlightStyle}
+                    setHighlightStyle={setHighlightStyle}
                 />
             </div>
 

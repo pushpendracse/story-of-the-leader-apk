@@ -13,7 +13,9 @@ const NewsRoom = React.forwardRef(({
     prompterHeight = 0.55, // 0.30 to 0.85
     prompterOpacity = 0.80, // 0.20 to 0.95
     fontSize = 20,
-    aspectRatio = '9:16'
+    aspectRatio = '9:16',
+    textAlign = 'justify',
+    highlightStyle = 'karaoke'
 }, ref) => {
     const { heading, content, mediaList, outroImage } = newsData || { heading: '', content: '', mediaList: [], outroImage: null };
     const [currentImgIdx, setCurrentImgIdx] = useState(0);
@@ -155,7 +157,6 @@ const NewsRoom = React.forwardRef(({
         : (cameraStream ? 'from-black/50 via-transparent to-black/75' : 'from-black/60 via-transparent to-black/85');
     const headerFooterBg = isLight ? 'bg-white/75 border-black/10' : 'bg-black/75 border-white/10';
 
-    // Prompter Alignment based on mode
     let prompterPositionClasses = 'justify-center items-center';
     let cardMaxHeightStyle = `${Math.round(prompterHeight * 100)}%`;
 
@@ -166,6 +167,51 @@ const NewsRoom = React.forwardRef(({
         prompterPositionClasses = 'justify-start items-center pt-2';
         cardMaxHeightStyle = `${Math.min(52, Math.round(prompterHeight * 100))}%`;
     }
+
+    const textAlignClass = textAlign === 'justify' ? 'text-justify' : textAlign === 'center' ? 'text-center' : 'text-left';
+
+    const getHighlightStyle = (i) => {
+        const progressCalc = `calc((var(--progress, 0) - ${i}) * 100%)`;
+        const base = { display: 'inline', whiteSpace: 'pre-wrap' };
+        
+        if (highlightStyle === 'karaoke' || highlightStyle === 'color') {
+            return {
+                ...base,
+                backgroundImage: `linear-gradient(to right, #f59e0b ${progressCalc}, ${isLight ? '#000000' : '#ffffff'} 0%)`,
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                color: 'transparent'
+            };
+        } else if (highlightStyle === 'box') {
+            return {
+                ...base,
+                backgroundImage: `linear-gradient(to right, rgba(245, 158, 11, 0.6) ${progressCalc}, transparent 0%)`,
+                backgroundClip: 'padding-box',
+                WebkitBackgroundClip: 'padding-box',
+                color: isLight ? 'black' : 'white',
+                borderRadius: '4px'
+            };
+        } else if (highlightStyle === 'underline') {
+            return {
+                ...base,
+                backgroundImage: `linear-gradient(to right, #f59e0b ${progressCalc}, transparent 0%)`,
+                backgroundPosition: 'bottom',
+                backgroundSize: '100% 4px',
+                backgroundRepeat: 'no-repeat',
+                color: isLight ? 'black' : 'white',
+            };
+        }
+        
+        // Default / Fallback
+        return {
+            ...base,
+            backgroundImage: `linear-gradient(to right, #f59e0b ${progressCalc}, transparent 0%)`,
+            backgroundClip: 'padding-box',
+            WebkitBackgroundClip: 'padding-box',
+            color: isLight ? 'black' : 'white'
+        };
+    };
 
     return (
         <div
@@ -224,27 +270,21 @@ const NewsRoom = React.forwardRef(({
                     ref={scrollRef}
                     style={{
                         maxHeight: cardMaxHeightStyle,
-                        backgroundColor: 'transparent'
+                        backgroundColor: 'transparent',
+                        maskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)',
+                        WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)'
                     }}
                     className={`w-full p-4 overflow-y-auto no-scrollbar transition-all duration-300`}
                 >
                     <div
                         style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
-                        className={`text-center relative whitespace-pre-wrap drop-shadow-sm font-semibold ${textColor}`}
+                        className={`relative drop-shadow-sm font-semibold w-full ${textAlignClass} ${textColor}`}
                     >
                         {graphemes.map((char, i) => (
                             <span
                                 key={i}
                                 className="char-span relative"
-                                style={{
-                                    backgroundImage: `linear-gradient(to right, #f59e0b calc((var(--progress, 0) - ${i}) * 100%), transparent 0%)`,
-                                    backgroundClip: 'padding-box',
-                                    WebkitBackgroundClip: 'padding-box',
-                                    display: 'inline',
-                                    whiteSpace: 'pre-wrap',
-                                    color: (isLight ? 'black' : 'white'),
-                                    transition: 'color 0.1s ease-out'
-                                }}
+                                style={getHighlightStyle(i)}
                             >
                                 {char}
                             </span>
