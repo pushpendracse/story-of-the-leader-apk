@@ -5,6 +5,7 @@ import { createReelRenderer } from './utils/canvasRenderer';
 import { saveReelVideo } from './utils/nativeFileSaver';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
 const App = () => {
@@ -45,7 +46,6 @@ const App = () => {
     const [toastMessage, setToastMessage] = useState(null);
     
     // YouTube Data API Variables
-    const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE";
     const [youtubeStatus, setYoutubeStatus] = useState("");
     const [isUploadingToYoutube, setIsUploadingToYoutube] = useState(false);
     const [showControls, setShowControls] = useState(true);
@@ -69,6 +69,14 @@ const App = () => {
     });
 
     const cancelRecordingRef = useRef(false);
+
+    useEffect(() => {
+        GoogleAuth.initialize({
+            clientId: '685075473984-c2i9t9mlkhsdcv6rcp90io49bhd84rol.apps.googleusercontent.com',
+            scopes: ['profile', 'email', 'https://www.googleapis.com/auth/youtube.upload'],
+            grantOfflineAccess: true,
+        });
+    }, []);
 
     // Real Camera Stream Management with Multi-tier Fallback
     useEffect(() => {
@@ -404,85 +412,73 @@ const App = () => {
         }
     };
 
-    const uploadToYouTube = () => {
+    const uploadToYouTube = async () => {
         if (!exportedVideo || !exportedVideo.blob) return;
 
-        if (GOOGLE_CLIENT_ID === "YOUR_GOOGLE_CLIENT_ID_HERE") {
-            alert("Studio Alert: Please replace GOOGLE_CLIENT_ID in App.jsx (line 42) with your actual Google Cloud Client ID to use this feature.");
-            return;
-        }
-
-        if (!window.google || !window.google.accounts) {
-            alert("Google API is loading. Please check your internet or try again in a few seconds.");
-            return;
-        }
-
         setIsUploadingToYoutube(true);
-        setYoutubeStatus("Logging into YouTube...");
+        setYoutubeStatus("Logging into Google...");
 
         try {
-            const client = window.google.accounts.oauth2.initTokenClient({
-                client_id: GOOGLE_CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/youtube.upload',
-                callback: async (response) => {
-                    if (response.error) {
-                        setIsUploadingToYoutube(false);
-                        setYoutubeStatus("");
-                        alert("YouTube Login Failed: " + response.error);
-                        return;
-                    }
-                    
-                    setYoutubeStatus("Uploading Video...");
-                    
-                    const accessToken = response.access_token;
-                    const metadata = {
-                        snippet: {
-                            title: draftNews.heading,
-                            description: draftNews.content + "\n\n#Shorts #News",
-                            tags: ['shorts', 'news', 'story'],
-                            categoryId: '25' // News & Politics
-                        },
-                        status: {
-                            privacyStatus: 'private', // private initially so you can review
-                            selfDeclaredMadeForKids: false
-                        }
-                    };
+            // Trigger Native Google Sign In
+            const googleUser = await GoogleAuth.signIn();
+            const accessToken = googleUser.authentication?.accessToken;
 
-                    const formData = new FormData();
-                    formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                    formData.append('file', exportedVideo.blob);
+            if (!accessToken) {
+                setIsUploadingToYoutube(false);
+                setYoutubeStatus("");
+                alert("Authentication failed. No access token received.");
+                return;
+            }
 
-                    try {
-                        const res = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`
-                            },
-                            body: formData
-                        });
-
-                        const data = await res.json();
-                        setIsUploadingToYoutube(false);
-                        
-                        if (data.id) {
-                            setYoutubeStatus("");
-                            alert("🎉 Success! Video uploaded to YouTube (Private). Video ID: " + data.id);
-                        } else {
-                            setYoutubeStatus("");
-                            alert("YouTube Upload Error: " + (data.error?.message || JSON.stringify(data)));
-                        }
-                    } catch (uploadError) {
-                        setIsUploadingToYoutube(false);
-                        setYoutubeStatus("");
-                        alert("Upload failed: " + uploadError.message);
-                    }
+            setYoutubeStatus("Uploading Video...");
+            
+            const metadata = {
+                snippet: {
+                    title: draftNews.heading,
+                    description: draftNews.content + "\n\n#Shorts #News",
+                    tags: ['shorts', 'news', 'story'],
+                    categoryId: '25' // News & Politics
                 },
-            });
-            client.requestAccessToken();
-        } catch (initError) {
+                status: {
+                    privacyStatus: 'private', // private initially so you can review
+                    selfDeclaredMadeForKids: false
+                }
+            };
+
+            const formData = new FormData();
+            formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            formData.append('file', exportedVideo.blob);
+
+            try {
+                const res = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=multipart&part=snippet,status', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: formData
+                });
+
+                const data = await res.json();
+                setIsUploadingToYoutube(false);
+                
+                if (data.id) {
+                    setYoutubeStatus("");
+                    alert("🎉 Success! Video uploaded to YouTube (Private). Video ID: " + data.id);
+                } else {
+                    setYoutubeStatus("");
+                    alert("YouTube Upload Error: " + (data.error?.message || JSON.stringify(data)));
+                }
+            } catch (uploadError) {
+                setIsUploadingToYoutube(false);
+                setYoutubeStatus("");
+                alert("Upload failed: " + uploadError.message);
+            }
+
+        } catch (authError) {
+            console.error(authError);
             setIsUploadingToYoutube(false);
             setYoutubeStatus("");
-            alert("Error initializing Google Identity Services.");
+            alert("Google Sign-In canceled or failed.");
         }
     };
 

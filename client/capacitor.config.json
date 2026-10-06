@@ -6,5 +6,12 @@
   "android": {
     "allowMixedContent": true,
     "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": ["profile", "email", "https://www.googleapis.com/auth/youtube.upload"],
+      "serverClientId": "685075473984-c2i9t9mlkhsdcv6rcp90io49bhd84rol.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
   }
 }
