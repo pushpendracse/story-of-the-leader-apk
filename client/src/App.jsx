@@ -216,7 +216,7 @@ const App = () => {
             };
             animationFrameRef.current = requestAnimationFrame(renderLoop);
 
-            const canvasStream = canvas.captureStream(30);
+            const canvasStream = canvas.captureStream(60);
             activeStreamRef.current = canvasStream;
             let finalStream = canvasStream;
 

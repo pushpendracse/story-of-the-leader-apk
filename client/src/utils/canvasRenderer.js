@@ -311,13 +311,14 @@ export const createReelRenderer = ({
                     const lineY = activeScrollY + lineIdx * lineHeight;
                     if (lineY > cardY - 90 && lineY < cardY + cardH + 90) {
                         
-                        // Edge Fade Effect (optimized, removed blur filter for performance)
+                        // Edge Fade Effect perfectly matching 15% preview mask
                         let lineAlpha = 1;
+                        const fadeDist = cardH * 0.15;
                         const distToTop = lineY - (cardY + 20);
                         const distToBottom = (cardY + cardH - 20) - (lineY + lineHeight);
                         
-                        if (distToTop < 60) lineAlpha = Math.max(0, distToTop / 60);
-                        if (distToBottom < 60) lineAlpha = Math.min(lineAlpha, Math.max(0, distToBottom / 60));
+                        if (distToTop < fadeDist) lineAlpha = Math.max(0, distToTop / fadeDist);
+                        if (distToBottom < fadeDist) lineAlpha = Math.min(lineAlpha, Math.max(0, distToBottom / fadeDist));
                         
                         ctx.globalAlpha = lineAlpha;
 
@@ -357,8 +358,9 @@ export const createReelRenderer = ({
                             
                             if (isPassed || isPassing) {
                                 if (highlightStyle === 'box') {
-                                    ctx.fillStyle = isPassed ? 'rgba(245, 158, 11, 0.6)' : `rgba(245, 158, 11, ${0.6 * ratio})`;
-                                    ctx.fillRect(curX - 1, lineY - 2, chWidth + 2, activeFontSize + 12);
+                                    ctx.fillStyle = 'rgba(245, 158, 11, 0.6)';
+                                    const bw = isPassed ? chWidth + 2 : (chWidth + 2) * ratio;
+                                    ctx.fillRect(curX - 1, lineY - 2, bw, activeFontSize + 12);
                                 } else if (highlightStyle === 'underline') {
                                     ctx.fillStyle = highlightColor;
                                     const uw = isPassed ? chWidth : chWidth * ratio;
