@@ -15,7 +15,8 @@ const NewsRoom = React.forwardRef(({
     fontSize = 20,
     aspectRatio = '9:16',
     textAlign = 'justify',
-    highlightStyle = 'karaoke'
+    highlightStyle = 'karaoke',
+    fontFamily = 'serif'
 }, ref) => {
     const { heading, content, mediaList, outroImage } = newsData || { heading: '', content: '', mediaList: [], outroImage: null };
     const [currentImgIdx, setCurrentImgIdx] = useState(0);
@@ -172,6 +173,16 @@ const NewsRoom = React.forwardRef(({
 
     const textAlignClass = textAlign === 'justify' ? 'text-justify' : textAlign === 'center' ? 'text-center' : 'text-left';
 
+    const getFontFamilyStyle = () => {
+        switch (fontFamily) {
+            case 'handwritten': return '"Kalam", cursive';
+            case 'display': return '"Oswald", sans-serif';
+            case 'sans-serif': return '"Roboto", sans-serif';
+            case 'serif':
+            default: return '"Playfair Display", serif';
+        }
+    };
+
     const getHighlightStyle = (i) => {
         const progressCalc = `calc((var(--progress, 0) - ${i}) * 100%)`;
         const base = { display: 'inline', whiteSpace: 'pre-wrap' };
@@ -260,7 +271,7 @@ const NewsRoom = React.forwardRef(({
 
             {/* Header Section */}
             <div className={`relative p-4 pb-3 backdrop-blur-md z-30 border-b mx-3 mt-3 rounded-2xl shadow-xl ${headerFooterBg} ${isLight ? 'border-gray-300' : 'border-white/10'}`}>
-                <h1 className={`text-base md:text-lg font-black text-center uppercase leading-tight line-clamp-2 drop-shadow-md tracking-tight ${textColor}`}>
+                <h1 className={`text-base md:text-lg font-black text-center uppercase leading-tight line-clamp-2 drop-shadow-md tracking-tight ${textColor}`} style={{ fontFamily: getFontFamilyStyle() }}>
                     {heading}
                 </h1>
                 <div className="h-[3px] w-14 bg-red-600 mt-2 mx-auto rounded-full shadow-red-500/50 shadow-md"></div>
@@ -280,7 +291,7 @@ const NewsRoom = React.forwardRef(({
                 >
                     <div
                         ref={textContainerRef}
-                        style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
+                        style={{ fontSize: `${fontSize}px`, lineHeight: 1.7, fontFamily: getFontFamilyStyle() }}
                         className={`relative drop-shadow-sm font-semibold w-full ${textAlignClass} ${textColor}`}
                     >
                         {graphemes.map((char, i) => (

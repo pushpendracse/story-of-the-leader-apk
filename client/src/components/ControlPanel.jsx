@@ -33,7 +33,9 @@ const ControlPanel = ({
     textAlign,
     setTextAlign,
     highlightStyle,
-    setHighlightStyle
+    setHighlightStyle,
+    fontFamily,
+    setFontFamily
 }) => {
     const { heading: h, content: c, mediaList: mediaPreviews, outroImage } = draftNews;
 
@@ -150,16 +152,28 @@ const ControlPanel = ({
                     <label className="text-[11px] uppercase font-black tracking-widest text-neutral-400 block mb-1">
                         🎨 Formatting & Highlights
                     </label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mb-2">
+                        <select
+                            value={fontFamily}
+                            onChange={(e) => setFontFamily(e.target.value)}
+                            className="flex-1 py-2 px-3 rounded-xl font-bold text-[11px] bg-neutral-800 text-white border border-neutral-700 focus:outline-none focus:border-yellow-500"
+                        >
+                            <option value="serif">🖋️ Serif (Standard)</option>
+                            <option value="sans-serif">🅰️ Modern</option>
+                            <option value="handwritten">✍️ Handwritten</option>
+                            <option value="display">⬛ Bold Display</option>
+                        </select>
                         <select
                             value={textAlign}
                             onChange={(e) => setTextAlign(e.target.value)}
-                            className="flex-1 py-2 px-3 rounded-xl font-bold text-xs bg-neutral-800 text-white border border-neutral-700 focus:outline-none focus:border-yellow-500"
+                            className="flex-1 py-2 px-3 rounded-xl font-bold text-[11px] bg-neutral-800 text-white border border-neutral-700 focus:outline-none focus:border-yellow-500"
                         >
-                            <option value="left">Align: Left</option>
-                            <option value="center">Align: Center</option>
-                            <option value="justify">Align: Justify</option>
+                            <option value="left">Left Align</option>
+                            <option value="center">Center Align</option>
+                            <option value="justify">Justify Align</option>
                         </select>
+                    </div>
+                    <div className="flex gap-2">
                         <select
                             value={highlightStyle}
                             onChange={(e) => setHighlightStyle(e.target.value)}

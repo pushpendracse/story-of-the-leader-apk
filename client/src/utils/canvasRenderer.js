@@ -15,7 +15,8 @@ export const createReelRenderer = ({
     fontSize = 44,
     aspectRatio = '9:16',
     textAlign = 'justify',
-    highlightStyle = 'karaoke'
+    highlightStyle = 'karaoke',
+    fontFamily = 'serif'
 }) => {
     const width = aspectRatio === '16:9' ? 1920 : 1080;
     const height = aspectRatio === '16:9' ? 1080 : 1920;
@@ -28,6 +29,16 @@ export const createReelRenderer = ({
     const graphemes = segmenter && content
         ? Array.from(segmenter.segment(content)).map(s => s.segment)
         : (content ? content.split('') : []);
+
+    const getCanvasFontFamily = () => {
+        switch (fontFamily) {
+            case 'handwritten': return '"Kalam", cursive';
+            case 'display': return '"Oswald", sans-serif';
+            case 'sans-serif': return '"Roboto", sans-serif';
+            case 'serif':
+            default: return '"Playfair Display", serif';
+        }
+    };
 
     let currentGraphemeProgress = 0;
     let currentImageIndex = 0;
@@ -221,7 +232,7 @@ export const createReelRenderer = ({
                     'rgba(255, 255, 255, 0.15)'
                 );
 
-                ctx.font = '900 44px serif';
+                ctx.font = `900 44px ${getCanvasFontFamily()}`;
                 ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -277,7 +288,7 @@ export const createReelRenderer = ({
                 ctx.clip();
 
                 const activeFontSize = fontSize || 44;
-                ctx.font = `600 ${activeFontSize}px serif`;
+                ctx.font = `600 ${activeFontSize}px ${getCanvasFontFamily()}`;
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
 

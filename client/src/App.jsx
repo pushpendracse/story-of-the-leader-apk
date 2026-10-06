@@ -36,6 +36,7 @@ const App = () => {
     const [aspectRatio, setAspectRatio] = useState('9:16'); // '9:16' or '16:9'
     const [textAlign, setTextAlign] = useState('justify'); // 'left' | 'center' | 'justify'
     const [highlightStyle, setHighlightStyle] = useState('karaoke'); // 'karaoke' | 'box' | 'underline' | 'color'
+    const [fontFamily, setFontFamily] = useState('serif'); // 'serif' | 'sans-serif' | 'handwritten' | 'display'
 
     // Export & Share Modal State
     const [exportedVideo, setExportedVideo] = useState(null);
@@ -198,7 +199,8 @@ const App = () => {
                 fontSize: fontSize * 2,
                 aspectRatio: aspectRatio,
                 textAlign: textAlign,
-                highlightStyle: highlightStyle
+                highlightStyle: highlightStyle,
+                fontFamily: fontFamily
             });
 
             let startTime = null;
@@ -569,6 +571,7 @@ const App = () => {
                     aspectRatio={aspectRatio}
                     textAlign={textAlign}
                     highlightStyle={highlightStyle}
+                    fontFamily={fontFamily}
                 />
 
                 {/* DIRECT BIG RED RECORD BUTTON ON PREVIEW SCREEN (INSTANT 1-TAP RECORDING) */}
@@ -659,6 +662,8 @@ const App = () => {
                     setTextAlign={setTextAlign}
                     highlightStyle={highlightStyle}
                     setHighlightStyle={setHighlightStyle}
+                    fontFamily={fontFamily}
+                    setFontFamily={setFontFamily}
                 />
             </div>
 
