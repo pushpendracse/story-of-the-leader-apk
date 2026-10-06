@@ -4,4 +4,5 @@
     <string name="title_activity_main">Story of the Leader</string>
     <string name="package_name">com.story.leader</string>
     <string name="custom_url_scheme">com.story.leader</string>
+    <string name="server_client_id">685075473984-c2i9t9mlkhsdcv6rcp90io49bhd84rol.apps.googleusercontent.com</string>
 </resources>
