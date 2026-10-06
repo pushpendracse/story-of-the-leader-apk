@@ -39,13 +39,29 @@ export const createReelRenderer = ({
     let endDelayStartTime = 0;
     let lastFrameTime = 0;
 
+    const processLine = (ctx, lineText, isLastInPara) => {
+        const lineChars = Array.from(
+            segmenter ? segmenter.segment(lineText) : lineText.split('')
+        ).map(s => typeof s === 'string' ? s : s.segment);
+        const chars = lineChars.map(ch => ({
+            str: ch,
+            width: ctx.measureText(ch).width
+        }));
+        return {
+            text: lineText,
+            chars: chars,
+            lineWidth: ctx.measureText(lineText).width,
+            isLastInPara
+        };
+    };
+
     // Helper: Wrap text into lines, preserving newlines
     const wrapText = (ctx, text, maxWidth) => {
         const lines = [];
         const paragraphs = text.split('\n');
         for (const p of paragraphs) {
             if (!p) {
-                lines.push({ text: '', isLastInPara: true });
+                lines.push({ text: '', chars: [], lineWidth: 0, isLastInPara: true });
                 continue;
             }
             const words = p.split(' ');
@@ -54,13 +70,13 @@ export const createReelRenderer = ({
                 const testLine = currentLine ? currentLine + ' ' + words[i] : words[i];
                 const metrics = ctx.measureText(testLine);
                 if (metrics.width > maxWidth && currentLine) {
-                    lines.push({ text: currentLine, isLastInPara: false });
+                    lines.push(processLine(ctx, currentLine, false));
                     currentLine = words[i];
                 } else {
                     currentLine = testLine;
                 }
             }
-            if (currentLine) lines.push({ text: currentLine, isLastInPara: true });
+            if (currentLine) lines.push(processLine(ctx, currentLine, true));
         }
         return lines;
     };
@@ -284,7 +300,7 @@ export const createReelRenderer = ({
                     const lineY = activeScrollY + lineIdx * lineHeight;
                     if (lineY > cardY - 90 && lineY < cardY + cardH + 90) {
                         
-                        // Edge Fade and Blur Effect
+                        // Edge Fade Effect (optimized, removed blur filter for performance)
                         let lineAlpha = 1;
                         const distToTop = lineY - (cardY + 20);
                         const distToBottom = (cardY + cardH - 20) - (lineY + lineHeight);
@@ -293,17 +309,9 @@ export const createReelRenderer = ({
                         if (distToBottom < 60) lineAlpha = Math.min(lineAlpha, Math.max(0, distToBottom / 60));
                         
                         ctx.globalAlpha = lineAlpha;
-                        if (lineAlpha < 1) {
-                            ctx.filter = `blur(${(1 - lineAlpha) * 3}px)`;
-                        } else {
-                            ctx.filter = 'none';
-                        }
 
-                        const lineChars = Array.from(
-                            segmenter ? segmenter.segment(lineText) : lineText.split('')
-                        ).map(s => typeof s === 'string' ? s : s.segment);
-
-                        const lineWidth = ctx.measureText(lineText).width;
+                        const lineChars = lineObj.chars;
+                        const lineWidth = lineObj.lineWidth;
                         let curX = cardX + 50; // default for left
 
                         if (textAlign === 'center') {
@@ -312,14 +320,15 @@ export const createReelRenderer = ({
 
                         let spaceExtra = 0;
                         if (textAlign === 'justify' && !lineObj.isLastInPara && lineChars.length > 0) {
-                            const spaceCount = lineChars.filter(c => c === ' ').length;
+                            const spaceCount = lineChars.filter(c => c.str === ' ').length;
                             if (spaceCount > 0) {
                                 spaceExtra = ((cardW - 100) - lineWidth) / spaceCount;
                             }
                         }
 
-                        lineChars.forEach((ch) => {
-                            const chWidth = ctx.measureText(ch).width;
+                        lineChars.forEach((chObj) => {
+                            const ch = chObj.str;
+                            const chWidth = chObj.width;
                             const charIndex = charAccumulator;
                             
                             const isPassed = currentGraphemeProgress >= charIndex + 1;

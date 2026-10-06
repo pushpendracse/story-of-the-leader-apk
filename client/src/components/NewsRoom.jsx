@@ -23,6 +23,7 @@ const NewsRoom = React.forwardRef(({
     const [showOutro, setShowOutro] = useState(false);
 
     const scrollRef = useRef(null);
+    const textContainerRef = useRef(null);
     const containerRef = useRef(null);
     const cameraVideoRef = useRef(null);
 
@@ -83,8 +84,9 @@ const NewsRoom = React.forwardRef(({
             }
 
             // Smooth scrolling centered on active reading character
-            if (scrollRef.current && containerRef.current) {
-                const charElements = containerRef.current.querySelectorAll('.char-span');
+            if (scrollRef.current && textContainerRef.current) {
+                // Highly optimized O(1) live collection access instead of heavy querySelectorAll
+                const charElements = textContainerRef.current.children;
                 const activeChar = charElements[Math.floor(currentProgress)];
 
                 if (activeChar) {
@@ -277,6 +279,7 @@ const NewsRoom = React.forwardRef(({
                     className={`w-full p-4 overflow-y-auto no-scrollbar transition-all duration-300`}
                 >
                     <div
+                        ref={textContainerRef}
                         style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
                         className={`relative drop-shadow-sm font-semibold w-full ${textAlignClass} ${textColor}`}
                     >
