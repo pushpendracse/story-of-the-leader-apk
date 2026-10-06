@@ -63,6 +63,8 @@ const App = () => {
         outroImage: null
     });
 
+    const cancelRecordingRef = useRef(false);
+
     // Real Camera Stream Management with Multi-tier Fallback
     useEffect(() => {
         let stream = null;
@@ -268,6 +270,24 @@ const App = () => {
             recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
 
             recorder.onstop = async () => {
+                if (cancelRecordingRef.current) {
+                    cancelRecordingRef.current = false;
+                    setIsRecording(false);
+                    setIsRecordingMode(false);
+                    setActiveTab('controls'); // Automatically go back to control room
+                    setRecordingStatus("");
+                    if (activeStreamRef.current) {
+                        activeStreamRef.current.getTracks().forEach(t => t.stop());
+                    }
+                    if (audioContextRef.current) {
+                        audioContextRef.current.close().catch(() => {});
+                    }
+                    if (animationFrameRef.current) {
+                        cancelAnimationFrame(animationFrameRef.current);
+                    }
+                    return;
+                }
+
                 setRecordingStatus("PROCESSING HD VIDEO...");
                 if (chunksRef.current.length > 0) {
                     const mimeType = selectedCodec.mime || chunksRef.current[0].type || 'video/mp4';
@@ -329,6 +349,16 @@ const App = () => {
     const stopRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
             mediaRecorderRef.current.stop();
+        }
+    };
+
+    const cancelRecording = () => {
+        cancelRecordingRef.current = true;
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        } else {
+            setIsRecordingMode(false);
+            setActiveTab('controls');
         }
     };
 
@@ -566,12 +596,20 @@ const App = () => {
 
                         <div className={`absolute top-6 left-4 z-[120] flex gap-2 transition-all duration-500 ${showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10 pointer-events-none'}`}>
                             {isRecording ? (
-                                <button
-                                    onClick={stopRecording}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-2xl shadow-2xl border border-red-400 active:scale-95 transition-all text-xs font-black uppercase tracking-widest flex items-center gap-2"
-                                >
-                                    <span>⏹</span> STOP & EXPORT REEL
-                                </button>
+                                <>
+                                    <button
+                                        onClick={stopRecording}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-2xl shadow-2xl border border-red-400 active:scale-95 transition-all text-[11px] font-black uppercase tracking-widest flex items-center gap-2"
+                                    >
+                                        <span>⏹</span> EXPORT REEL
+                                    </button>
+                                    <button
+                                        onClick={cancelRecording}
+                                        className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest border border-neutral-700 active:scale-95 transition-all flex items-center gap-2"
+                                    >
+                                        <span>↩</span> CANCEL & RETRY
+                                    </button>
+                                </>
                             ) : (
                                 <button
                                     onClick={() => setIsRecordingMode(false)}
