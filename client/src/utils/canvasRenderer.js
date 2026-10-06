@@ -229,8 +229,8 @@ export const createReelRenderer = ({
                 const lines = wrapText(ctx, heading.toUpperCase(), headerW - 60);
                 const lineHeight = 52;
                 const startY = headerY + (headerH / 2) - 15 - ((lines.length - 1) * lineHeight) / 2;
-                lines.forEach((line, idx) => {
-                    ctx.fillText(line, width / 2, startY + idx * lineHeight);
+                lines.forEach((lineObj, idx) => {
+                    ctx.fillText(lineObj.text, width / 2, startY + idx * lineHeight);
                 });
 
                 // Red Accent Bar
