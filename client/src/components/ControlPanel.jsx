@@ -180,6 +180,7 @@ const ControlPanel = ({
                             className="flex-1 py-2 px-3 rounded-xl font-bold text-xs bg-neutral-800 text-white border border-neutral-700 focus:outline-none focus:border-yellow-500"
                         >
                             <option value="karaoke">🎨 Style: Karaoke</option>
+                            <option value="none">🚫 No Highlight (Plain Text)</option>
                             <option value="box">🎨 Style: Box</option>
                             <option value="underline">🎨 Style: Underline</option>
                             <option value="color">🎨 Style: Color Fill</option>
@@ -242,8 +243,8 @@ const ControlPanel = ({
                         📐 Prompter Position on Screen
                     </label>
 
-                    {/* Mode buttons */}
-                    <div className="grid grid-cols-3 gap-2">
+                    {/* Mode buttons — 2×2 grid to fit all 4 modes */}
+                    <div className="grid grid-cols-2 gap-2">
                         <button
                             type="button"
                             onClick={() => setPrompterMode('center')}
@@ -265,7 +266,21 @@ const ControlPanel = ({
                         >
                             👁️ Top Camera
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setPrompterMode('krane')}
+                            className={`py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all ${prompterMode === 'krane' ? 'bg-yellow-500 text-black shadow-md' : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'}`}
+                        >
+                            🏗️ Krane Pan
+                        </button>
                     </div>
+
+                    {/* Krane mode description */}
+                    {prompterMode === 'krane' && (
+                        <p className="text-[10px] text-yellow-400/80 italic leading-relaxed bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
+                            Krane mode: full-screen cinematic pan — text slowly drifts downward as you read, like a crane shot. Header &amp; footer are hidden for maximum immersion.
+                        </p>
+                    )}
 
                     {/* Screen Height Coverage */}
                     <div className="space-y-1.5 pt-1">

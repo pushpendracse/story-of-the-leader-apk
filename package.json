@@ -1,0 +1,14 @@
+{
+  "name": "story-of-the-leader-apk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Story of the Leader - Studio & Android Reel APK",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "lint": "npm --prefix client run lint",
+    "preview": "npm --prefix client run preview",
+    "cap:sync": "npm --prefix client run cap:sync",
+    "cap:open": "npm --prefix client run cap:open"
+  }
+}

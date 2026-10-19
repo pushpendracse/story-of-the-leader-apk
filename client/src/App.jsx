@@ -5,6 +5,8 @@ import { createReelRenderer } from './utils/canvasRenderer';
 import { saveReelVideo } from './utils/nativeFileSaver';
 import { Capacitor } from '@capacitor/core';
 import { Share } from '@capacitor/share';
+import VideoEditor from './components/VideoEditor';
+import TimelineStudio from './components/TimelineStudio';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 
@@ -17,6 +19,8 @@ const App = () => {
     });
     const [audioEnabled, setAudioEnabled] = useState(false);
     const [liveSpeed, setLiveSpeed] = useState(105);
+
+    const [appMode, setAppMode] = useState('teleprompter'); // 'teleprompter' | 'video-editor'
 
     const [isRecordingMode, setIsRecordingMode] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -42,8 +46,11 @@ const App = () => {
     // Export & Share Modal State
     const [exportedVideo, setExportedVideo] = useState(null);
     const exportedVideoRef = useRef(null); // Bulletproof ref to prevent closure/batching nulls
-    const [showExportModal, setShowExportModal] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
+    const showSuccessNotification = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(null), 6000);
+    };
     
     // YouTube Data API Variables
     const [youtubeStatus, setYoutubeStatus] = useState("");
@@ -326,11 +333,7 @@ const App = () => {
                     
                     setRecordingStatus('');
                     setIsProcessing(false);
-                    
-                    // Auto-download right after stopping as requested by user
-                    setTimeout(() => {
-                        handleDownloadVideo();
-                    }, 800);
+                    // Do not auto-download immediately: user chooses Timeline Editor or Direct Save
                 }
                 setIsRecording(false);
                 setIsRecordingMode(false);
@@ -506,11 +509,6 @@ const App = () => {
             }
         };
 
-        const showSuccessNotification = (msg) => {
-            setToastMessage(msg);
-            setTimeout(() => setToastMessage(null), 6000); // Hide after 6 seconds
-        };
-
         if (Capacitor.isNativePlatform()) {
             try {
                 // Call the native file saver
@@ -537,6 +535,26 @@ const App = () => {
     return (
         <div className={`w-full h-[100dvh] bg-slate-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-slate-950 to-black flex flex-col md:flex-row overflow-hidden relative ${isRecordingMode && !showControls ? 'cursor-none' : ''}`} onMouseMove={handleMouseMove} onTouchStart={handleMouseMove}>
             
+            {appMode === 'video-editor' && (
+                <div className="absolute inset-0 z-[500]">
+                    <VideoEditor onClose={() => setAppMode('teleprompter')} />
+                </div>
+            )}
+
+            {appMode === 'timeline-studio' && (
+                <div className="absolute inset-0 z-[500]">
+                    <TimelineStudio
+                        initialVideo={exportedVideo}
+                        initialNews={draftNews}
+                        onClose={() => setAppMode('teleprompter')}
+                        onSaveSuccess={() => {
+                            setAppMode('teleprompter');
+                            showSuccessNotification('Reel successfully saved to phone gallery!');
+                        }}
+                    />
+                </div>
+            )}
+
             {/* Custom In-App Notification (Toast) */}
             {toastMessage && (
                 <div className="absolute top-10 left-1/2 -translate-x-1/2 z-[9999] bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-4 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.4)] flex items-center gap-4 transition-all duration-500 animate-in slide-in-from-top-10 fade-in zoom-in-95">
@@ -623,16 +641,37 @@ const App = () => {
 
                         {/* Prompter Mode Quick Picker */}
                         <div className="flex gap-1 bg-neutral-800/90 p-0.5 rounded-xl">
-                            {['center', 'bottom', 'top'].map(m => (
+                            {[
+                                { id: 'center', label: 'Center' },
+                                { id: 'bottom', label: 'Ticker' },
+                                { id: 'top', label: 'Top' },
+                                { id: 'krane', label: '🏗️ Krane' },
+                            ].map(m => (
                                 <button
-                                    key={m}
-                                    onClick={() => setPrompterMode(m)}
-                                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${prompterMode === m ? 'bg-yellow-500 text-black shadow-sm' : 'text-neutral-400'}`}
+                                    key={m.id}
+                                    onClick={() => setPrompterMode(m.id)}
+                                    className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${prompterMode === m.id ? 'bg-yellow-500 text-black shadow-sm' : 'text-neutral-400'}`}
                                 >
-                                    {m === 'center' ? 'Center' : m === 'bottom' ? 'Ticker' : 'Top'}
+                                    {m.label}
                                 </button>
                             ))}
                         </div>
+
+                        {/* Open Timeline Studio Button */}
+                        <button
+                            onClick={() => setAppMode('timeline-studio')}
+                            className="px-3.5 py-1.5 ml-1 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-md bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-400 hover:to-amber-400"
+                        >
+                            🎬 Timeline Studio
+                        </button>
+
+                        {/* Open Video Framer Button */}
+                        <button
+                            onClick={() => setAppMode('video-editor')}
+                            className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all bg-neutral-800 text-neutral-300 hover:text-white"
+                        >
+                            🎨 Framer
+                        </button>
                     </div>
                 )}
 
@@ -684,13 +723,13 @@ const App = () => {
                                 <>
                                     <button
                                         onClick={stopRecording}
-                                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-2xl shadow-2xl border border-red-400 active:scale-95 transition-all text-[11px] font-black uppercase tracking-widest flex items-center gap-2"
+                                        className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl shadow-2xl border border-red-400 active:scale-95 transition-all text-[11px] font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer"
                                     >
-                                        <span>⏹</span> EXPORT REEL
+                                        <span className="w-2.5 h-2.5 bg-white rounded-xs"></span> STOP RECORDING
                                     </button>
                                     <button
                                         onClick={cancelRecording}
-                                        className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest border border-neutral-700 active:scale-95 transition-all flex items-center gap-2"
+                                        className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest border border-neutral-700 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
                                     >
                                         <span>↩</span> CANCEL & RETRY
                                     </button>
@@ -698,12 +737,26 @@ const App = () => {
                             ) : (
                                 <button
                                     onClick={() => setIsRecordingMode(false)}
-                                    className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-neutral-700"
+                                    className="bg-neutral-800 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-neutral-700 cursor-pointer"
                                 >
                                     Exit Studio
                                 </button>
                             )}
                         </div>
+
+                        {/* Always-Visible Fixed Bottom Stop Button during Recording */}
+                        {isRecording && (
+                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[130] flex items-center justify-center pointer-events-auto">
+                                <button
+                                    type="button"
+                                    onClick={stopRecording}
+                                    className="relative group bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white px-8 py-4 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-[0_0_35px_rgba(225,29,72,0.8)] border-2 border-white/40 cursor-pointer animate-pulse"
+                                >
+                                    <span className="w-3.5 h-3.5 bg-white rounded-xs shadow-[0_0_10px_rgba(255,255,255,0.9)]"></span>
+                                    <span>⏹ STOP RECORDING</span>
+                                </button>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -781,25 +834,34 @@ const App = () => {
                             />
                         </div>
 
-                        <p className="text-[11px] text-neutral-400 text-center">
-                            Your vertical reel is saved in Full HD MP4 and ready to post on Instagram Reels, YouTube Shorts, or WhatsApp!
+                        <p className="text-[11px] text-neutral-300 text-center leading-relaxed">
+                            Video recorded! Open in <b>Timeline Studio</b> to sync images, text, add focus markers, BGM & noise filters, or save directly.
                         </p>
 
                         {/* Actions */}
-                        <div className="relative z-10 w-full space-y-3 mt-2">
+                        <div className="relative z-10 w-full space-y-2.5 mt-2">
+                            {/* Primary Action: Timeline Editor */}
                             <button
-                                onClick={uploadToYouTube}
-                                disabled={isUploadingToYoutube}
-                                className={`w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-black rounded-2xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(220,38,38,0.4)] active:scale-95 transition-all ${isUploadingToYoutube ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={() => {
+                                    setAppMode('timeline-studio');
+                                }}
+                                className="w-full py-4 bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 hover:from-yellow-400 hover:to-amber-300 text-black font-black rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(245,158,11,0.5)] active:scale-95 transition-all animate-pulse"
                             >
-                                📺 {isUploadingToYoutube ? youtubeStatus : "Publish to YouTube Shorts"}
+                                🎬 Open in Timeline Video Editor
+                            </button>
+
+                            <button
+                                onClick={() => handleDownloadVideo()}
+                                className="w-full py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-white/20 active:scale-95 transition-all shadow-md"
+                            >
+                                💾 Direct Save to Phone
                             </button>
 
                             <button
                                 onClick={handleShareVideo}
-                                className="w-full py-3.5 bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-black font-black rounded-2xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(251,191,36,0.4)] active:scale-95 transition-all"
+                                className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold rounded-2xl uppercase tracking-wider text-xs flex items-center justify-center gap-2 border border-neutral-700 active:scale-95 transition-all"
                             >
-                                📤 Share to WhatsApp / Instagram
+                                📤 Share Reel
                             </button>
 
                             <button

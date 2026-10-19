@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const NewsRoom = React.forwardRef(({
     newsData,
@@ -27,6 +27,9 @@ const NewsRoom = React.forwardRef(({
     const textContainerRef = useRef(null);
     const containerRef = useRef(null);
     const cameraVideoRef = useRef(null);
+    // Krane mode: tracks vertical pan offset driven by reading progress
+    const kraneOffsetRef = useRef(0);
+    const kraneTargetRef = useRef(0);
 
     // Bind camera stream to local preview video element
     useEffect(() => {
@@ -101,6 +104,21 @@ const NewsRoom = React.forwardRef(({
                     }
                 }
             }
+
+            // Krane mode: slowly pan the entire text block downward as reading progresses
+            if (prompterMode === 'krane' && textContainerRef.current && graphemes.length > 0) {
+                const progressRatio = currentProgress / graphemes.length;
+                // Pan from 0% (top) to 60% of the text height as reading advances
+                const textH = textContainerRef.current.scrollHeight || 0;
+                const containerH = scrollRef.current?.clientHeight || 1;
+                const maxPan = Math.max(0, textH - containerH * 0.6);
+                kraneTargetRef.current = progressRatio * maxPan;
+                // Smooth easing toward target
+                kraneOffsetRef.current += (kraneTargetRef.current - kraneOffsetRef.current) * 0.04;
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = kraneOffsetRef.current;
+                }
+            }
         }
         lastFrameTime.current = time;
         if (progressRef.current < graphemes.length) {
@@ -169,6 +187,10 @@ const NewsRoom = React.forwardRef(({
     } else if (prompterMode === 'top') {
         prompterPositionClasses = 'justify-start items-center pt-2';
         cardMaxHeightStyle = `${Math.min(52, Math.round(prompterHeight * 100))}%`;
+    } else if (prompterMode === 'krane') {
+        // Krane: full-height vertical pan — card takes up entire content area
+        prompterPositionClasses = 'justify-start items-center';
+        cardMaxHeightStyle = '100%';
     }
 
     const textAlignClass = textAlign === 'justify' ? 'text-justify' : textAlign === 'center' ? 'text-center' : 'text-left';
@@ -187,6 +209,14 @@ const NewsRoom = React.forwardRef(({
         const progressCalc = `calc((var(--progress, 0) - ${i}) * 100%)`;
         const base = { display: 'inline', whiteSpace: 'pre-wrap' };
         
+        if (highlightStyle === 'none') {
+            return {
+                ...base,
+                color: isLight ? '#000000' : '#ffffff',
+                textDecoration: 'none'
+            };
+        }
+
         if (highlightStyle === 'karaoke' || highlightStyle === 'color') {
             return {
                 ...base,
@@ -270,7 +300,7 @@ const NewsRoom = React.forwardRef(({
             <div className={`absolute inset-0 z-10 bg-gradient-to-b ${overlayGradient} pointer-events-none`}></div>
 
             {/* Header Section */}
-            <div className={`relative p-4 pb-3 backdrop-blur-md z-30 border-b mx-3 mt-3 rounded-2xl shadow-xl ${headerFooterBg} ${isLight ? 'border-gray-300' : 'border-white/10'}`}>
+            <div className={`relative p-4 pb-3 backdrop-blur-md z-30 border-b mx-3 mt-3 rounded-2xl shadow-xl ${headerFooterBg} ${isLight ? 'border-gray-300' : 'border-white/10'} ${prompterMode === 'krane' ? 'hidden' : ''}`}>
                 <h1 className={`text-base md:text-lg font-black text-center uppercase leading-tight line-clamp-2 drop-shadow-md tracking-tight ${textColor}`} style={{ fontFamily: getFontFamilyStyle() }}>
                     {heading}
                 </h1>
@@ -279,6 +309,57 @@ const NewsRoom = React.forwardRef(({
 
             {/* Content / Prompter Area with Adjustable Mode and Height */}
             <div className={`flex-grow px-3 overflow-hidden z-20 relative flex flex-col ${prompterPositionClasses}`}>
+                {/* Krane mode: cinematic full-screen vertical pan */}
+                {prompterMode === 'krane' ? (
+                    <>
+                        {/* Krane badge — top-left indicator */}
+                        <div className="absolute top-3 left-3 z-40 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full border border-yellow-500/40 shadow-lg pointer-events-none">
+                            <span className="text-yellow-500 text-[9px] font-black uppercase tracking-widest">🏗️ Krane</span>
+                        </div>
+
+                        {/* Headline shown inside the krane card at top */}
+                        {heading && (
+                            <div className="w-full px-1 pt-10 pb-2 shrink-0">
+                                <h2 className={`text-base font-black text-center uppercase leading-tight drop-shadow-md tracking-tight ${textColor}`} style={{ fontFamily: getFontFamilyStyle() }}>
+                                    {heading}
+                                </h2>
+                                <div className="h-[3px] w-10 bg-red-600 mt-1.5 mx-auto rounded-full"></div>
+                            </div>
+                        )}
+
+                        <div
+                            ref={scrollRef}
+                            style={{
+                                maxHeight: cardMaxHeightStyle,
+                                // No card bg — pure transparent overlay, cinematic look
+                                backgroundColor: 'transparent',
+                                // Stronger edge fade for krane pan effect
+                                maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 88%, transparent 100%)',
+                                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 88%, transparent 100%)',
+                            }}
+                            className="w-full flex-1 overflow-y-auto no-scrollbar"
+                        >
+                            <div
+                                ref={textContainerRef}
+                                style={{
+                                    fontSize: `${fontSize}px`,
+                                    lineHeight: 1.85,
+                                    fontFamily: getFontFamilyStyle(),
+                                    // Extra padding so first/last lines are readable through the fade
+                                    paddingTop: '12%',
+                                    paddingBottom: '18%',
+                                }}
+                                className={`relative font-semibold w-full px-4 drop-shadow-lg ${textAlignClass} ${textColor}`}
+                            >
+                                {graphemes.map((char, i) => (
+                                    <span key={i} className="char-span relative" style={getHighlightStyle(i)}>
+                                        {char}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
                 <div
                     ref={scrollRef}
                     style={{
@@ -305,10 +386,11 @@ const NewsRoom = React.forwardRef(({
                         ))}
                     </div>
                 </div>
+                )}
             </div>
 
             {/* Footer Branding Bar */}
-            <div className={`relative bottom-0 w-full h-14 backdrop-blur-md border-t flex items-center justify-center z-30 ${headerFooterBg}`}>
+            <div className={`relative bottom-0 w-full h-14 backdrop-blur-md border-t flex items-center justify-center z-30 ${headerFooterBg} ${prompterMode === 'krane' ? 'hidden' : ''}`}>
                 <div className={`border px-3 py-1 rounded-full text-[9px] font-sans tracking-widest uppercase font-black ${isLight ? 'border-black/30 text-gray-700 bg-black/5' : 'border-white/30 text-gray-300 bg-white/5'}`}>
                     Historical Archive • StoryOfTheLeader
                 </div>

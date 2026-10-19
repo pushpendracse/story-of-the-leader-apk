@@ -173,7 +173,7 @@ export const createReelRenderer = ({
                 ctx.restore();
             }
 
-            // 2. Background Media with Ken Burns Zoom & Pan (when camera is not active)
+            // 2. Background Media with Cinematic Entrance Animation & Ken Burns
             if (!hasLiveCamera && mediaImages.length > 0) {
                 if (imageStartTime === 0) imageStartTime = timestamp;
                 const elapsedSinceImg = timestamp - imageStartTime;
@@ -184,14 +184,22 @@ export const createReelRenderer = ({
 
                 const img = mediaImages[currentImageIndex];
                 if (img && img.complete && img.naturalWidth > 0) {
-                    const progress = (timestamp - imageStartTime) / 8000;
-                    const scale = 1.05 + 0.12 * Math.sin(progress * Math.PI);
+                    const elapsed = timestamp - imageStartTime;
+                    const entranceDuration = 1200; // 1.2s entrance animation
+                    const entranceProgress = Math.min(1, elapsed / entranceDuration);
+                    const easeOut = 1 - Math.pow(1 - entranceProgress, 3);
+
+                    const progress = elapsed / 8000;
+                    // Cinematic entrance scale + subtle pulse
+                    const entranceScale = 0.92 + (0.16 * easeOut);
+                    const scale = entranceScale + 0.06 * Math.sin(progress * Math.PI);
                     const drawW = width * scale;
                     const drawH = height * scale;
                     const offsetX = (width - drawW) / 2;
                     const offsetY = (height - drawH) / 2;
 
                     ctx.save();
+                    ctx.globalAlpha = easeOut;
                     ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
                     ctx.restore();
                 }
@@ -214,13 +222,13 @@ export const createReelRenderer = ({
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
 
-            // 3. Header Section (Episode / News Title)
+            // 3. Header Section (Episode / News Title) — hidden in krane mode
             const headerX = 60;
             const headerY = 70;
             const headerW = width - 120;
             const headerH = 200;
 
-            if (heading) {
+            if (heading && prompterMode !== 'krane') {
                 drawRoundedRect(
                     ctx,
                     headerX,
@@ -275,10 +283,37 @@ export const createReelRenderer = ({
                     // Top Prompter (Eye contact near camera lens)
                     cardH = Math.min(750, calculatedH);
                     cardY = headerY + headerH + 30;
+                } else if (prompterMode === 'krane') {
+                    // Krane: full-screen immersive — card spans nearly the whole canvas,
+                    // no header/footer reserved, text pans downward with reading progress
+                    cardH = height - 140; // top 70px + bottom 70px breathing room
+                    cardY = 70;
                 } else {
                     // Center Card (Classic full studio)
                     cardH = calculatedH;
                     cardY = headerY + headerH + 30 + (availableArea - calculatedH) / 2;
+                }
+
+                // Krane: draw inline heading at the very top of the card
+                if (prompterMode === 'krane' && heading) {
+                    ctx.save();
+                    ctx.font = `900 46px ${getCanvasFontFamily()}`;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 18;
+                    const hLines = wrapText(ctx, heading.toUpperCase(), cardW - 60);
+                    const hLineH = 54;
+                    hLines.forEach((lineObj, idx) => {
+                        ctx.fillText(lineObj.text, width / 2, cardY + 54 + idx * hLineH);
+                    });
+                    // Red accent bar under inline heading
+                    ctx.fillStyle = '#dc2626';
+                    ctx.shadowBlur = 0;
+                    const hBlockH = hLines.length * hLineH + 20;
+                    drawRoundedRect(ctx, width / 2 - 70, cardY + hBlockH + 10, 140, 6, 3, '#dc2626', null);
+                    ctx.restore();
                 }
 
                 // Clip within card for scrolling
@@ -299,10 +334,28 @@ export const createReelRenderer = ({
                 const charRatio = currentGraphemeProgress / Math.max(1, graphemes.length);
                 const currentLineIndex = Math.min(lines.length - 1, Math.floor(charRatio * lines.length));
 
-                // Smooth vertical scrolling centering on current line
-                const centerTargetOffset = cardH * 0.35;
-                const targetScrollY = cardY + centerTargetOffset - currentLineIndex * lineHeight;
-                const activeScrollY = targetScrollY;
+                let activeScrollY;
+                if (prompterMode === 'krane') {
+                    // Krane pan: text starts near the top of the card and slowly drifts down
+                    // as reading progresses — mimics a real crane camera pull-down.
+                    // kraneTextTop = where line 0 begins (offset from cardY so first line is visible)
+                    const inlineHeadingOffset = heading
+                        ? (wrapText(ctx, heading.toUpperCase(), cardW - 60).length * 54 + 80)
+                        : 0;
+                    const kraneStart = cardY + inlineHeadingOffset + activeFontSize;
+                    const totalTextH = lines.length * lineHeight;
+                    // Max pan: text bottom aligns with card bottom (minus fade zone)
+                    const maxPan = Math.max(0, totalTextH - (cardH - inlineHeadingOffset - activeFontSize - cardH * 0.12));
+                    const kranePan = charRatio * maxPan;
+                    activeScrollY = kraneStart - kranePan;
+                } else {
+                    // Standard center-tracking scroll
+                    const centerTargetOffset = cardH * 0.35;
+                    activeScrollY = cardY + centerTargetOffset - currentLineIndex * lineHeight;
+                }
+
+                // Edge fade distances — stronger for krane (8%) vs standard (15%)
+                const fadePct = prompterMode === 'krane' ? 0.08 : 0.15;
 
                 let charAccumulator = 0;
 
@@ -311,9 +364,9 @@ export const createReelRenderer = ({
                     const lineY = activeScrollY + lineIdx * lineHeight;
                     if (lineY > cardY - 90 && lineY < cardY + cardH + 90) {
                         
-                        // Edge Fade Effect perfectly matching 15% preview mask
+                        // Edge Fade Effect
                         let lineAlpha = 1;
-                        const fadeDist = cardH * 0.15;
+                        const fadeDist = cardH * fadePct;
                         const distToTop = lineY - (cardY + 20);
                         const distToBottom = (cardY + cardH - 20) - (lineY + lineHeight);
                         
@@ -347,7 +400,7 @@ export const createReelRenderer = ({
                             const isPassing = currentGraphemeProgress > charIndex && currentGraphemeProgress < charIndex + 1;
                             const ratio = isPassing ? currentGraphemeProgress - charIndex : (isPassed ? 1 : 0);
 
-                            const textColorLight = 'rgba(255, 255, 255, 0.88)';
+                            const textColorLight = 'rgba(255, 255, 255, 0.95)';
                             const textColorDark = 'rgba(255, 255, 255, 0.40)';
                             const highlightColor = '#f59e0b';
                             
@@ -356,7 +409,7 @@ export const createReelRenderer = ({
                                 charColor = textColorDark;
                             }
                             
-                            if (isPassed || isPassing) {
+                            if (highlightStyle !== 'none' && (isPassed || isPassing)) {
                                 if (highlightStyle === 'box') {
                                     ctx.fillStyle = 'rgba(245, 158, 11, 0.6)';
                                     const bw = isPassed ? chWidth + 2 : (chWidth + 2) * ratio;
@@ -368,7 +421,7 @@ export const createReelRenderer = ({
                                 }
                             }
 
-                            if (highlightStyle === 'karaoke' || highlightStyle === 'color') {
+                            if (highlightStyle !== 'none' && (highlightStyle === 'karaoke' || highlightStyle === 'color')) {
                                 if (isPassed) {
                                     ctx.fillStyle = highlightColor;
                                     ctx.shadowColor = '#d97706';
@@ -418,24 +471,36 @@ export const createReelRenderer = ({
                 }
             }
 
-            // 5. Footer Branding Bar
-            const footerY = height - 110;
-            drawRoundedRect(
-                ctx,
-                width / 2 - 290,
-                footerY,
-                580,
-                50,
-                25,
-                'rgba(15, 15, 20, 0.75)',
-                'rgba(255, 255, 255, 0.15)'
-            );
-            ctx.font = '800 20px sans-serif';
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 0;
-            ctx.fillText('HISTORICAL ARCHIVE • STORY OF THE LEADER', width / 2, footerY + 25);
+            // 5. Footer Branding Bar — hidden in krane mode
+            if (prompterMode !== 'krane') {
+                const footerY = height - 110;
+                drawRoundedRect(
+                    ctx,
+                    width / 2 - 290,
+                    footerY,
+                    580,
+                    50,
+                    25,
+                    'rgba(15, 15, 20, 0.75)',
+                    'rgba(255, 255, 255, 0.15)'
+                );
+                ctx.font = '800 20px sans-serif';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 0;
+                ctx.fillText('HISTORICAL ARCHIVE • STORY OF THE LEADER', width / 2, footerY + 25);
+            } else {
+                // Krane mode: small badge bottom-center
+                const badgeY = height - 80;
+                drawRoundedRect(ctx, width / 2 - 120, badgeY, 240, 44, 22, 'rgba(0,0,0,0.55)', 'rgba(245,158,11,0.4)');
+                ctx.font = '700 18px sans-serif';
+                ctx.fillStyle = 'rgba(245,158,11,0.9)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 0;
+                ctx.fillText('🏗️ KRANE MODE', width / 2, badgeY + 22);
+            }
         }
     };
 };
